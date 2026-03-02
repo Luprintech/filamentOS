@@ -1,0 +1,12 @@
+node_modules
+**/node_modules
+**/.git
+**/.gitignore
+**/dist
+backend/data.db
+backend/data/
+**/.env*
+**/*.log
+docs/
+README.md
+.claude/

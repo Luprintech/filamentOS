@@ -38,3 +38,4 @@ yarn-error.log*
 # base de datos local SQLite
 data.db
 backend/data.db
+

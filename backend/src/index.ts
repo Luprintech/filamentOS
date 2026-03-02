@@ -12,11 +12,11 @@ import AdmZip from 'adm-zip';
 
 dotenv.config();
 
-const PORT = 3001;
+const PORT = parseInt(process.env.PORT || '3001', 10);
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:9002';
 
 // ── Base de datos SQLite ───────────────────────────────────────────────────────
-const db = new Database(path.join(process.cwd(), 'data.db'));
+const db = new Database(process.env.DB_PATH ?? path.join(process.cwd(), 'data.db'));
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
@@ -88,6 +88,7 @@ passport.deserializeUser((id: unknown, done) => {
 
 // ── Express ───────────────────────────────────────────────────────────────────
 const app = express();
+app.set('trust proxy', 1); // necesario detrás de Nginx
 const upload = multer({ storage: multer.memoryStorage() });
 
 app.use(cors({ origin: CLIENT_ORIGIN, credentials: true }));
@@ -101,7 +102,7 @@ app.use(
     cookie: {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 días
       httpOnly: true,
-      secure: false,
+      secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
     },
   })
