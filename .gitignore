@@ -39,3 +39,7 @@ yarn-error.log*
 data.db
 backend/data.db
 
+# artefactos locales y temporales
+backend/*.log
+nul
+openspec/

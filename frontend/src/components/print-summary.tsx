@@ -40,7 +40,7 @@ export const PrintSummary = ({ form, calculations }: PrintSummaryProps) => {
     return (
       <div className="p-8 font-body text-black bg-white">
         <header className="flex items-center justify-between mb-8 border-b pb-4">
-            <h1 className="font-headline text-2xl font-bold text-primary">Calculadora de Luprintech</h1>
+            <h1 className="font-headline text-2xl font-bold text-primary">Calculadora de costes</h1>
             <img src="/Logo.svg" alt="Logo de Luprintech" width={80} height={80} className="rounded-full" />
         </header>
 

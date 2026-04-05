@@ -55,7 +55,7 @@ import {
 import { TooltipProvider } from "./ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 
-export function CalculatorForm({ form }: { form: UseFormReturn<FormData> }) {
+export function CalculatorForm({ form, onProjectSaved }: { form: UseFormReturn<FormData>; onProjectSaved?: () => void }) {
   const { toast } = useToast();
   const { user, loginWithGoogle } = useAuth();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -151,6 +151,7 @@ export function CalculatorForm({ form }: { form: UseFormReturn<FormData> }) {
       } else {
         toast({ title: "¡Guardado correctamente!" });
         form.reset(defaultFormValues);
+        onProjectSaved?.();
       }
     } catch (err) {
       console.error("Error inesperado al guardar el proyecto:", err);
@@ -660,7 +661,7 @@ Coste de Máquina: ${formatCurrency(calculations.currentMachineCost)}`;
                 {isSaving ? 'Guardando...' : 'Guardar Proyecto'}
               </Button>
               <Button type="button" onClick={handleShare} variant="outline" className="w-full sm:w-auto"><Share2 className="mr-2 h-4 w-4"/> Compartir</Button>
-              <Button type="button" onClick={handlePrint} className="w-full sm:w-auto bg-accent text-accent-foreground hover:bg-accent/80 transition-transform hover:scale-105"><Printer className="mr-2 h-4 w-4"/> Imprimir Resumen</Button>
+              <Button type="button" onClick={handlePrint} className="w-full sm:w-auto bg-accent text-accent-foreground hover:bg-accent/80 transition-transform hover:scale-105"><Printer className="mr-2 h-4 w-4"/> Guardar en PDF</Button>
           </div>
         </div>
 

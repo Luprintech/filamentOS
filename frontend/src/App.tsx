@@ -12,13 +12,16 @@ import { formSchema, type FormData } from '@/lib/schema';
 import { defaultFormValues } from '@/lib/defaults';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { SavedProjectsDialog } from '@/components/saved-projects-dialog';
 import { LoginPage } from '@/components/login-page';
 import { AuthProvider, useAuth } from '@/context/auth-context';
 import { usePwaInstall } from '@/hooks/use-pwa-install';
 import { useCookieConsent } from '@/hooks/use-cookie-consent';
 import { CookieBanner } from '@/components/cookie-banner';
 import { PrivacyPolicyModal } from '@/components/privacy-policy-modal';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { FilamentTracker } from '@/components/filament-challenge/filament-tracker';
+import { TrackerGalaxyBackground } from '@/components/filament-challenge/tracker-galaxy-background';
+import { CostProjectsPanel } from '@/components/cost-projects-panel';
 
 function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
@@ -37,6 +40,7 @@ function ThemeToggle() {
 function Calculator() {
   const { user, logout, loginWithGoogle } = useAuth();
   const { canInstall, install } = usePwaInstall();
+  const [projectRefreshKey, setProjectRefreshKey] = React.useState(0);
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: defaultFormValues,
@@ -49,7 +53,7 @@ function Calculator() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-between p-4 sm:p-8 md:p-12">
-      <div className="w-full max-w-4xl">
+      <div className="w-full max-w-5xl">
         <header className="mb-8 flex flex-col items-center gap-4 text-center print:hidden sm:flex-row sm:justify-between">
           <div className="flex items-center gap-4">
             <img
@@ -67,11 +71,6 @@ function Calculator() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <SavedProjectsDialog form={form}>
-              <Button variant="outline" size="sm">
-                <FolderOpen className="mr-2 h-4 w-4" /> Proyectos
-              </Button>
-            </SavedProjectsDialog>
             {canInstall && (
               <Button variant="outline" size="sm" onClick={install} title="Instalar aplicación">
                 <Download className="mr-2 h-4 w-4" /> Instalar
@@ -98,7 +97,44 @@ function Calculator() {
           </div>
         </header>
 
-        <CalculatorForm form={form} />
+        <Tabs defaultValue="calculator" className="w-full">
+          <TabsList className="mb-6 w-full print:hidden sm:w-auto">
+            <TabsTrigger value="calculator" className="flex-1 sm:flex-none font-bold">
+              🧮 Calculadora de costes
+            </TabsTrigger>
+            <TabsTrigger value="challenge" className="flex-1 sm:flex-none font-bold">
+              📊 Tracker de series
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="calculator">
+            <div className="relative overflow-hidden rounded-[32px]">
+              <TrackerGalaxyBackground />
+              <div className="relative z-10 space-y-6 p-1 cost-shell">
+                <section className="cost-hero rounded-[28px] border border-white/[0.10] p-6 sm:p-7">
+                  <div className="mb-1 inline-flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-xs font-bold text-[hsl(var(--challenge-blue))]">
+                    🧮 Calculadora de costes
+                  </div>
+                  <h2 className="challenge-gradient-text text-3xl font-black leading-none sm:text-4xl">
+                    Calcula, guarda y reutiliza
+                  </h2>
+                  <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                    Define tu trabajo, calcula el coste real de impresión y guarda tus proyectos para reutilizarlos cuando quieras.
+                  </p>
+                </section>
+
+                <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_340px] 2xl:grid-cols-[minmax(0,1fr)_360px]">
+                  <CalculatorForm form={form} onProjectSaved={() => setProjectRefreshKey((value) => value + 1)} />
+                  <CostProjectsPanel form={form} refreshKey={projectRefreshKey} />
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="challenge">
+            <FilamentTracker />
+          </TabsContent>
+        </Tabs>
       </div>
 
       <footer className="w-full py-6 text-center text-sm text-muted-foreground print:hidden mt-12">
@@ -117,10 +153,11 @@ function Calculator() {
           </a>
         </div>
         <p className="mb-2">
-          ¿Tienes dudas? Escríbeme a{' '}
+          ¿Tienes dudas o quieres que implemente alguna mejora? Escríbeme a{' '}
           <a href="mailto:luprintech@gmail.com" className="text-primary hover:underline">
             luprintech@gmail.com
           </a>
+          {' '}o contáctame por redes sociales.
         </p>
         <p className="mb-2">&copy; {currentYear} Guadalupe Cano. Todos los derechos reservados.</p>
         <p>

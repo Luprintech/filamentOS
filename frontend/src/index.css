@@ -32,25 +32,31 @@
   }
 
   .dark {
-    --background: 224 71.4% 4.1%;
-    --foreground: 210 20% 98%;
-    --card: 224 71.4% 4.1%;
-    --card-foreground: 210 20% 98%;
-    --popover: 224 71.4% 4.1%;
-    --popover-foreground: 210 20% 98%;
-    --primary: 197 76% 53%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 215 27.9% 16.9%;
-    --secondary-foreground: 210 20% 98%;
-    --muted: 215 27.9% 16.9%;
-    --muted-foreground: 217.9 10.6% 64.9%;
-    --accent: 30 100% 60%;
-    --accent-foreground: 24 9.8% 10%;
-    --destructive: 0 62.8% 30.6%;
+    /* ── Base tokens ──────────────────────────────────────────────────────── */
+    --background: 228 71% 4%;
+    --foreground: 220 20% 97%;
+    --card: 228 58% 7%;
+    --card-foreground: 220 20% 97%;
+    --popover: 228 58% 7%;
+    --popover-foreground: 220 20% 97%;
+    --primary: 291 100% 70%;
+    --primary-foreground: 228 71% 4%;
+    --secondary: 225 30% 13%;
+    --secondary-foreground: 220 20% 97%;
+    --muted: 225 30% 13%;
+    --muted-foreground: 222 15% 58%;
+    --accent: 192 100% 57%;
+    --accent-foreground: 228 71% 4%;
+    --destructive: 345 75% 58%;
     --destructive-foreground: 0 0% 98%;
-    --border: 215 27.9% 16.9%;
-    --input: 215 27.9% 16.9%;
-    --ring: 197 76% 53%;
+    --border: 228 40% 14%;
+    --input: 228 40% 14%;
+    --ring: 291 100% 70%;
+
+    /* ── Challenge palette (neón) ─────────────────────────────────────────── */
+    --challenge-pink: 291 100% 70%;
+    --challenge-blue: 192 100% 57%;
+    --challenge-green: 160 74% 56%;
   }
 }
 
@@ -61,11 +67,23 @@
   body {
     @apply bg-background text-foreground font-body antialiased;
   }
+
+  /* Dark mode: fondo con gradientes radiales igual que la calculadora del reto */
+  .dark body {
+    background:
+      radial-gradient(circle at top left,  rgba(217, 102, 255, 0.14) 0%, transparent 28%),
+      radial-gradient(circle at top right, rgba(35,  199, 255, 0.12) 0%, transparent 26%),
+      radial-gradient(circle at bottom center, rgba(55, 227, 165, 0.10) 0%, transparent 22%),
+      linear-gradient(180deg, hsl(228 71% 3%) 0%, hsl(228 65% 4%) 50%, hsl(228 71% 2%) 100%);
+  }
 }
 
 @layer utilities {
   .animate-fade-in {
     animation: fade-in 0.75s ease-in-out;
+  }
+  .animate-tracker-celebration {
+    animation: tracker-celebration 0.65s ease-out;
   }
   @keyframes fade-in {
     from {
@@ -76,5 +94,157 @@
       opacity: 1;
       transform: translateY(0);
     }
+  }
+
+  @keyframes tracker-celebration {
+    0% {
+      opacity: 0;
+      transform: translateY(10px) scale(0.98);
+    }
+    55% {
+      opacity: 1;
+      transform: translateY(-2px) scale(1.01);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+}
+
+/* ── Challenge: componentes específicos del reto de 30 días ───────────────── */
+@layer components {
+
+  /* Hero section del reto */
+  .dark .challenge-hero {
+    background: linear-gradient(180deg,
+      hsl(228 58% 7% / 0.88),
+      hsl(228 65% 5% / 0.92)
+    );
+    box-shadow: 0 20px 80px rgba(0, 0, 0, 0.42);
+  }
+
+  .dark .cost-hero {
+    background: linear-gradient(180deg,
+      hsl(228 58% 7% / 0.88),
+      hsl(228 65% 5% / 0.92)
+    );
+    box-shadow: 0 20px 80px rgba(0, 0, 0, 0.42);
+  }
+
+  /* Panels (form + list) */
+  .dark .challenge-panel {
+    background: hsl(228 58% 7% / 0.72);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 20px 80px rgba(0, 0, 0, 0.32);
+  }
+
+  .dark .cost-shell .rounded-lg.border.bg-card {
+    background: linear-gradient(180deg,
+      hsl(228 58% 7% / 0.78),
+      hsl(228 62% 6% / 0.84)
+    );
+    backdrop-filter: blur(14px);
+    border-color: rgba(255, 255, 255, 0.10);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.26);
+  }
+
+  .dark .cost-shell .bg-muted\/50 {
+    background: linear-gradient(90deg,
+      rgba(217,102,255,0.10),
+      rgba(35,199,255,0.10)
+    );
+  }
+
+  .dark .cost-shell .text-primary {
+    text-shadow: 0 0 16px hsl(var(--challenge-blue) / 0.12);
+  }
+
+  /* Stat cards dentro del hero */
+  .dark .challenge-stat-card {
+    background: linear-gradient(180deg,
+      rgba(255, 255, 255, 0.06),
+      rgba(255, 255, 255, 0.03)
+    );
+  }
+
+  /* Gradient text para títulos */
+  .dark .challenge-gradient-text {
+    background: linear-gradient(90deg,
+      hsl(var(--challenge-pink)),
+      #a992ff 45%,
+      hsl(var(--challenge-blue))
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Botón primario del reto */
+  .dark .challenge-btn-primary {
+    background: linear-gradient(90deg,
+      hsl(var(--challenge-pink)),
+      hsl(var(--challenge-blue))
+    );
+    color: white;
+    box-shadow: 0 6px 20px hsl(var(--challenge-blue) / 0.20);
+    border: none;
+  }
+  .dark .challenge-btn-primary:hover {
+    box-shadow: 0 10px 28px hsl(var(--challenge-blue) / 0.30);
+    transform: translateY(-2px);
+  }
+
+  .dark .tracker-milestone-banner {
+    position: relative;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 15% 20%, rgba(255,255,255,0.16), transparent 20%),
+      radial-gradient(circle at 85% 25%, rgba(35,199,255,0.22), transparent 26%),
+      radial-gradient(circle at 25% 85%, rgba(55,227,165,0.16), transparent 22%),
+      linear-gradient(135deg,
+        rgba(217,102,255,0.32),
+        rgba(125,92,255,0.30) 35%,
+        rgba(35,199,255,0.24) 70%,
+        rgba(55,227,165,0.18)
+      );
+    box-shadow:
+      0 18px 40px rgba(0, 0, 0, 0.24),
+      0 0 0 1px rgba(255,255,255,0.06) inset;
+    animation: tracker-celebration 0.65s ease-out;
+  }
+
+  .dark .tracker-milestone-banner::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      repeating-linear-gradient(120deg, rgba(255,255,255,0.08) 0 2px, transparent 2px 42px),
+      radial-gradient(circle at top right, rgba(255,255,255,0.14), transparent 30%);
+    opacity: 0.55;
+    pointer-events: none;
+  }
+
+  /* Inputs y textareas del reto en dark — glow focus neón */
+  .dark .challenge-input:focus,
+  .dark .challenge-textarea:focus {
+    border-color: hsl(var(--challenge-blue) / 0.70);
+    box-shadow: 0 0 0 3px hsl(var(--challenge-blue) / 0.12);
+  }
+
+  /* Tabs: neón glow en el trigger activo en dark mode */
+  .dark [data-radix-collection-item][data-state="active"] {
+    background: hsl(var(--card));
+    box-shadow: 0 0 0 1px hsl(var(--challenge-pink) / 0.35),
+                0 2px 12px hsl(var(--challenge-pink) / 0.15);
+    color: hsl(var(--challenge-pink));
+  }
+
+  /* Cards shadcn en dark: glass effect */
+  .dark .rounded-lg.border.bg-card {
+    background: hsl(var(--card) / 0.72);
+    backdrop-filter: blur(12px);
+    border-color: rgba(255, 255, 255, 0.09);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
   }
 }
