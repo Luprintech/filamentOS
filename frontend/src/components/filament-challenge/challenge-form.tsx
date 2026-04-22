@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
+import { cn, generateId } from '@/lib/utils';
 import { parseTimeBlock, formatCost } from './filament-storage';
 import { getTrackerSuccessMessage } from './tracker-messages';
 import type { EditingState, FilamentPiece, FilamentProject, PieceFilamentInput } from './filament-types';
@@ -33,7 +33,7 @@ interface FilamentRow {
 
 function emptyRow(): FilamentRow {
   return {
-    key: crypto.randomUUID(),
+    key: generateId(),
     mode: 'manual',
     spoolId: '',
     colorHex: '#888888',

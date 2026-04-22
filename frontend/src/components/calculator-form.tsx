@@ -2,6 +2,7 @@
 import React, { useRef, useState } from "react";
 import { useFieldArray, type UseFormReturn } from "react-hook-form";
 import { type FormData } from "@/lib/schema";
+import { generateId } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -349,7 +350,7 @@ export function CalculatorForm({ form, onProjectSaved }: { form: UseFormReturn<F
   React.useEffect(() => {
     if (filamentFields.length === 0) {
       appendFilament({
-        id: crypto.randomUUID(),
+        id: generateId(),
         mode: 'manual',
         spoolId: '',
         filamentType: 'PLA',
@@ -640,7 +641,7 @@ export function CalculatorForm({ form, onProjectSaved }: { form: UseFormReturn<F
                         />
                       ))}
                       <Button type="button" variant="outline" size="sm" className="rounded-full text-xs font-bold"
-                        onClick={() => appendFilament({ id: crypto.randomUUID(), mode: 'manual', spoolId: '', filamentType: 'PLA', colorHex: '#888888', colorName: '', brand: '', grams: 0, spoolPrice: 0, spoolWeight: 1000 })}
+                        onClick={() => appendFilament({ id: generateId(), mode: 'manual', spoolId: '', filamentType: 'PLA', colorHex: '#888888', colorName: '', brand: '', grams: 0, spoolPrice: 0, spoolWeight: 1000 })}
                       >
                         <Plus className="mr-1.5 h-3.5 w-3.5" />
                         {t('tracker.filaments.addColor')}
