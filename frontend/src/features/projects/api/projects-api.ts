@@ -25,6 +25,13 @@ export const projectsApi = {
     });
   },
 
+  async update(id: string, data: Omit<Project, 'id' | 'createdAt'>): Promise<{ id: string }> {
+    return httpRequest<{ id: string }>({
+      url: `/api/projects/${id}`,
+      init: jsonRequest('PUT', data),
+    });
+  },
+
   async delete(id: string): Promise<void> {
     await httpRequest<{ success: true }>({
       url: `/api/projects/${id}`,

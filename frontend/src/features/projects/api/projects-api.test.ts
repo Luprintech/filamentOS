@@ -10,40 +10,43 @@ vi.mock('@/shared/api/http-client', () => ({
 }));
 
 import { httpRequest, jsonRequest } from '@/shared/api/http-client';
-import { deleteProject, getProjects, saveProject } from './projects-api';
+import { projectsApi } from './projects-api';
 
 const mockedHttpRequest = vi.mocked(httpRequest);
 const mockedJsonRequest = vi.mocked(jsonRequest);
 
-describe('projects-api', () => {
+describe('projectsApi', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('getProjects retorna data cuando httpRequest resuelve', async () => {
+  // ── getAll ────────────────────────────────────────────────────────────────
+
+  it('getAll resuelve con el array devuelto por httpRequest', async () => {
     mockedHttpRequest.mockResolvedValue([{ id: '1' }] as never);
 
-    const result = await getProjects();
+    const result = await projectsApi.getAll();
 
-    expect(result).toEqual({ data: [{ id: '1' }], error: null });
+    expect(result).toEqual([{ id: '1' }]);
     expect(mockedHttpRequest).toHaveBeenCalledWith({ url: '/api/projects' });
   });
 
-  it('getProjects retorna mensaje de error cuando falla', async () => {
-    mockedHttpRequest.mockRejectedValue(new Error('boom'));
+  it('getAll relanza el error cuando httpRequest falla', async () => {
+    mockedHttpRequest.mockRejectedValue(new Error('network error'));
 
-    const result = await getProjects();
-
-    expect(result).toEqual({ data: null, error: 'Error al cargar los proyectos.' });
+    await expect(projectsApi.getAll()).rejects.toThrow('network error');
   });
 
-  it('saveProject retorna id en caso exitoso', async () => {
-    mockedHttpRequest.mockResolvedValue({ id: 'p1' } as never);
+  // ── save ──────────────────────────────────────────────────────────────────
+
+  it('save llama POST y devuelve el proyecto creado', async () => {
+    const savedProject = { id: 'p1', jobName: 'Test', createdAt: '2026-01-01' };
+    mockedHttpRequest.mockResolvedValue(savedProject as never);
     const { id: _id, ...payload } = defaultFormValues;
 
-    const result = await saveProject('u1', payload);
+    const result = await projectsApi.save(payload as never);
 
-    expect(result).toEqual({ id: 'p1', error: null });
+    expect(result).toEqual(savedProject);
     expect(mockedJsonRequest).toHaveBeenCalledWith('POST', payload);
     expect(mockedHttpRequest).toHaveBeenCalledWith({
       url: '/api/projects',
@@ -51,32 +54,29 @@ describe('projects-api', () => {
     });
   });
 
-  it('saveProject retorna error cuando falla', async () => {
-    mockedHttpRequest.mockRejectedValue(new Error('boom'));
+  it('save relanza el error cuando httpRequest falla', async () => {
+    mockedHttpRequest.mockRejectedValue(new Error('server error'));
     const { id: _id, ...payload } = defaultFormValues;
 
-    const result = await saveProject('u1', payload);
-
-    expect(result).toEqual({ id: null, error: 'Error al guardar el proyecto.' });
+    await expect(projectsApi.save(payload as never)).rejects.toThrow('server error');
   });
 
-  it('deleteProject retorna null en error cuando request es exitosa', async () => {
-    mockedHttpRequest.mockResolvedValue({ success: true } as never);
+  // ── delete ────────────────────────────────────────────────────────────────
 
-    const result = await deleteProject('p1');
+  it('delete llama DELETE con el id correcto', async () => {
+    mockedHttpRequest.mockResolvedValue(undefined as never);
 
-    expect(result).toEqual({ error: null });
+    await projectsApi.delete('p1');
+
     expect(mockedHttpRequest).toHaveBeenCalledWith({
       url: '/api/projects/p1',
       init: { method: 'DELETE' },
     });
   });
 
-  it('deleteProject retorna mensaje de error cuando falla', async () => {
-    mockedHttpRequest.mockRejectedValue(new Error('boom'));
+  it('delete relanza el error cuando httpRequest falla', async () => {
+    mockedHttpRequest.mockRejectedValue(new Error('not found'));
 
-    const result = await deleteProject('p1');
-
-    expect(result).toEqual({ error: 'Error al eliminar el proyecto.' });
+    await expect(projectsApi.delete('p1')).rejects.toThrow('not found');
   });
 });

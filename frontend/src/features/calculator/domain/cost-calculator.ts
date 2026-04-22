@@ -2,12 +2,21 @@ export interface OtherCostItem {
   price?: number;
 }
 
+export interface FilamentRowCalcInput {
+  grams: number;
+  spoolPrice: number;
+  spoolWeight: number;
+}
+
 export interface CostCalculatorInput {
   printingTimeHours: number;
   printingTimeMinutes: number;
+  // Legacy single-filament fields
   filamentWeight: number;
   spoolWeight: number;
   spoolPrice: number;
+  // Multi-filament array (takes precedence when non-empty)
+  filaments?: FilamentRowCalcInput[];
   powerConsumptionWatts: number;
   energyCostKwh: number;
   prepTime: number;
@@ -50,7 +59,15 @@ export function calculateCostBreakdown(input: CostCalculatorInput): CostCalculat
       ? (input.powerConsumptionWatts / 1000) * totalPrintingTimeHours * input.energyCostKwh
       : 0;
 
-  const filamentCost = input.spoolWeight > 0 ? (input.filamentWeight / input.spoolWeight) * input.spoolPrice : 0;
+  const filamentCost =
+    input.filaments && input.filaments.length > 0
+      ? input.filaments.reduce(
+          (sum, f) => sum + (f.spoolWeight > 0 ? (f.grams / f.spoolWeight) * f.spoolPrice : 0),
+          0,
+        )
+      : input.spoolWeight > 0
+        ? (input.filamentWeight / input.spoolWeight) * input.spoolPrice
+        : 0;
   const prepCost = (input.prepTime / 60) * input.prepCostPerHour;
   const totalPostProcessingTimeHours = input.postProcessingTimeInMinutes / 60;
   const postProcessingCost = totalPostProcessingTimeHours * input.postProcessingCostPerHour;

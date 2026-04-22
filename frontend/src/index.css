@@ -9,27 +9,27 @@
 
 @layer base {
   :root {
-    --background: 206 25% 95%;
+    --background: 260 20% 97%;
     --foreground: 224 71.4% 4.1%;
     --card: 0 0% 100%;
     --card-foreground: 224 71.4% 4.1%;
     --popover: 0 0% 100%;
     --popover-foreground: 224 71.4% 4.1%;
-    --primary: 197 76% 53%;
+    --primary: 271 65% 52%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 220 13% 91%;
-    --secondary-foreground: 220 9% 46%;
-    --muted: 220 13% 91%;
-    --muted-foreground: 220 9% 46%;
-    --accent: 30 100% 60%;
-    --accent-foreground: 24 9.8% 10%;
+    --secondary: 260 15% 92%;
+    --secondary-foreground: 260 10% 40%;
+    --muted: 260 15% 92%;
+    --muted-foreground: 260 10% 46%;
+    --accent: 192 90% 42%;
+    --accent-foreground: 0 0% 100%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 220 13% 89%;
-    --input: 220 13% 89%;
-    --ring: 197 76% 53%;
-    --challenge-pink: 291 65% 45%;
-    --challenge-blue: 197 76% 38%;
+    --border: 260 12% 88%;
+    --input: 260 12% 88%;
+    --ring: 271 65% 52%;
+    --challenge-pink: 291 68% 50%;
+    --challenge-blue: 205 90% 45%;
     --challenge-green: 160 60% 36%;
     --radius: 0.5rem;
   }
@@ -79,6 +79,15 @@
       radial-gradient(circle at bottom center, rgba(55, 227, 165, 0.10) 0%, transparent 22%),
       linear-gradient(180deg, hsl(228 71% 3%) 0%, hsl(228 65% 4%) 50%, hsl(228 71% 2%) 100%);
   }
+
+  /* Light mode: mismo lenguaje de degradados radiales, muy sutil */
+  body:not(.dark) {
+    background:
+      radial-gradient(circle at top left,  rgba(160, 80, 230, 0.07) 0%, transparent 30%),
+      radial-gradient(circle at top right, rgba(50, 160, 240, 0.05) 0%, transparent 28%),
+      radial-gradient(circle at bottom center, rgba(130, 60, 200, 0.04) 0%, transparent 24%),
+      hsl(var(--background));
+  }
 }
 
 @layer utilities {
@@ -119,9 +128,13 @@
 @layer components {
 
   .challenge-hero, .cost-hero {
-    background: linear-gradient(180deg, hsl(0 0% 100% / 0.90), hsl(0 0% 98% / 0.95));
+    background: linear-gradient(135deg,
+      hsl(271 65% 52% / 0.06) 0%,
+      hsl(0 0% 100% / 0.92) 40%,
+      hsl(205 90% 45% / 0.04) 100%
+    );
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
-    border: 1px solid hsl(220 13% 89%);
+    border: 1px solid hsl(260 12% 88%);
   }
 
   .challenge-panel {
@@ -135,7 +148,7 @@
   }
 
   .challenge-gradient-text {
-    background: linear-gradient(90deg, hsl(var(--challenge-pink)), #7c5cbf 45%, hsl(var(--challenge-blue)));
+    background: linear-gradient(90deg, hsl(var(--challenge-pink)), #8b5cf6 45%, hsl(var(--challenge-blue)));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -278,6 +291,13 @@
   .dark .challenge-textarea:focus {
     border-color: hsl(var(--challenge-blue) / 0.70);
     box-shadow: 0 0 0 3px hsl(var(--challenge-blue) / 0.12);
+  }
+
+  /* Tabs: glow en trigger activo en light mode */
+  [data-radix-collection-item][data-state="active"] {
+    box-shadow: 0 0 0 1px hsl(var(--challenge-pink) / 0.25),
+                0 2px 8px hsl(var(--challenge-pink) / 0.10);
+    color: hsl(var(--challenge-pink));
   }
 
   /* Tabs: neón glow en el trigger activo en dark mode */

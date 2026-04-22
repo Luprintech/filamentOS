@@ -6,7 +6,7 @@ export interface FilamentProject {
   coverImage: string | null;
   /** Total pieces goal (e.g. 30, 100, or any number) */
   goal: number;
-  /** Price per kilogram in the chosen currency */
+  /** Price per kilogram in the chosen currency (fallback when no spool price available) */
   pricePerKg: number;
   currency: string;
   totalPieces: number;
@@ -16,6 +16,28 @@ export interface FilamentProject {
   createdAt: string;
   /** ISO timestamp of last modification */
   updatedAt: string;
+}
+
+// ── Filamento por pieza ──────────────────────────────────────────────────────────
+export interface PieceFilament {
+  id: string;
+  pieceId: string;
+  /** ID de la bobina del inventario (null si es entrada manual) */
+  spoolId: string | null;
+  colorHex: string;
+  colorName: string;
+  brand: string;
+  material: string;
+  grams: number;
+}
+
+export interface PieceFilamentInput {
+  spoolId?: string | null;
+  colorHex: string;
+  colorName: string;
+  brand: string;
+  material: string;
+  grams: number;
 }
 
 // ── Pieza ───────────────────────────────────────────────────────────────────────
@@ -28,16 +50,20 @@ export interface FilamentPiece {
   name: string;
   /** Raw textarea content — one time-string per line */
   timeText: string;
-  /** Raw textarea content — one gram-number per line */
+  /** Raw textarea content — kept for legacy display */
   gramText: string;
   totalSecs: number;
   totalGrams: number;
-  /** Computed: totalGrams * (project.pricePerKg / 1000) — stored for fast reads */
+  /** Computed: sum of per-filament costs — stored for fast reads */
   totalCost: number;
   timeLines: number;
   gramLines: number;
   /** Data URL (base64) de la imagen de la pieza, o null si no tiene */
   imageUrl: string | null;
+  /** ID de la bobina de inventario usada (legacy — usar filaments en su lugar) */
+  spoolId?: string | null;
+  /** Filamentos multicolor — vacío en piezas legacy */
+  filaments: PieceFilament[];
 }
 
 // ── Stats ────────────────────────────────────────────────────────────────────────

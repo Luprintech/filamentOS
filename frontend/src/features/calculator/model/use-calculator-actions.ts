@@ -6,7 +6,7 @@ import type { FormData } from '@/lib/schema';
 import type { LocalUser } from '@/context/auth-context';
 import type { CostCalculations } from '@/features/calculator/domain/cost-calculator';
 import { buildShareSummary } from '@/features/calculator/lib/share-summary';
-import { useSaveProject } from '@/features/projects/api/use-projects';
+import { useSaveProject, useUpdateProject } from '@/features/projects/api/use-projects';
 import { useGcodeAnalysis } from '@/features/calculator/api/use-gcode-analysis';
 
 interface ToastInput {
@@ -51,6 +51,7 @@ export function useCalculatorActions({
 
   // Usar hooks de React Query en lugar de llamadas manuales
   const saveProjectMutation = useSaveProject();
+  const updateProjectMutation = useUpdateProject();
   const gcodeAnalysisMutation = useGcodeAnalysis();
 
   const formatCurrency = (amount: number) => {
@@ -83,16 +84,31 @@ export function useCalculatorActions({
     }
 
     const formData = form.getValues();
+    const existingId = formData.id;
     const dataToSave = JSON.parse(JSON.stringify(formData));
-    if (dataToSave.id) delete dataToSave.id;
+    delete dataToSave.id;
 
-    // Usar mutation de React Query
-    saveProjectMutation.mutate(dataToSave, {
-      onSuccess: () => {
-        form.reset(defaultFormValues);
-        onProjectSaved?.();
-      },
-    });
+    if (existingId) {
+      // Proyecto cargado → actualizar en lugar de duplicar
+      updateProjectMutation.mutate(
+        { id: existingId, data: dataToSave },
+        {
+          onSuccess: () => {
+            // Mantener el proyecto cargado en el form con su id
+            form.setValue('id', existingId, { shouldDirty: false });
+            onProjectSaved?.();
+          },
+        }
+      );
+    } else {
+      // Proyecto nuevo → crear
+      saveProjectMutation.mutate(dataToSave, {
+        onSuccess: () => {
+          form.reset(defaultFormValues);
+          onProjectSaved?.();
+        },
+      });
+    }
   };
 
   const handleGcodeAnalyze = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -203,7 +219,7 @@ export function useCalculatorActions({
 
   return {
     isAnalyzing: gcodeAnalysisMutation.isPending,
-    isSaving: saveProjectMutation.isPending,
+    isSaving: saveProjectMutation.isPending || updateProjectMutation.isPending,
     analysisFeedback,
     formatCurrency,
     handleNewProject,

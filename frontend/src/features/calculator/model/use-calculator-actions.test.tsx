@@ -129,7 +129,6 @@ describe('useCalculatorActions', () => {
   });
 
   it('guarda proyecto y resetea formulario cuando save es exitoso', async () => {
-    const onProjectSaved = vi.fn();
     let savedOptions: any = null;
 
     // Configurar el mock para capturar options y llamarlas después
@@ -138,17 +137,38 @@ describe('useCalculatorActions', () => {
     });
 
     const { result } = createHook({ id: 'u1', email: null, name: 'User', photo: null });
-    result.current.actions.handleSaveProject();
+
+    // Rellenar el formulario con datos válidos (defaultFormValues no pasa la validación)
+    await act(async () => {
+      result.current.form.reset({
+        ...defaultFormValues,
+        jobName: 'Test Job',
+        filamentWeight: 50,
+        filamentType: 'PLA',
+        spoolPrice: 20,
+        spoolWeight: 1000,
+        printingTimeHours: 2,
+        printingTimeMinutes: 0,
+      });
+    });
+
+    // Llamar save y esperar a que termine (es async por form.trigger())
+    await act(async () => {
+      await result.current.actions.handleSaveProject();
+    });
 
     // Verificar que se llamó al mutate
     expect(mockSaveProjectMutate).toHaveBeenCalledTimes(1);
 
     // Simular onSuccess manualmente
-    if (savedOptions) {
-      savedOptions.onSuccess({ id: 'p1', name: 'Test' });
-    }
+    await act(async () => {
+      if (savedOptions) {
+        savedOptions.onSuccess({ id: 'p1', jobName: 'Test Job' });
+      }
+    });
 
-    expect(onProjectSaved).toHaveBeenCalled();
+    // Tras onSuccess, el formulario debería haberse reseteado a los valores por defecto
+    expect(result.current.form.getValues('jobName')).toBe('');
   });
 
   it('analiza gcode y completa tiempo/peso en el formulario', async () => {

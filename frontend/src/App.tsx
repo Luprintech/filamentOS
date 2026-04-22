@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Github, Youtube, Instagram, FolderOpen, LogOut, Sun, Moon, Download, Calculator as CalculatorIcon, BarChart3 } from 'lucide-react';
+import { Github, Youtube, Instagram, FolderOpen, LogOut, Sun, Moon, Download, Calculator as CalculatorIcon, BarChart3, LineChart, Package, FlaskConical } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useTranslation } from 'react-i18next';
@@ -28,6 +28,12 @@ import { LanguageSelector } from '@/components/language-selector';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { QueryProvider } from '@/components/query-provider';
 
+import { InventoryDashboard } from '@/features/inventory';
+
+const StatsDashboard = React.lazy(() =>
+  import('@/features/stats/components/stats-dashboard').then((m) => ({ default: m.StatsDashboard }))
+);
+
 function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
   const { t } = useTranslation();
@@ -44,10 +50,28 @@ function ThemeToggle() {
 }
 
 function Calculator() {
-  const { user, logout, loginWithGoogle } = useAuth();
+  const { user, logout, loginWithGoogle, loading: authLoading } = useAuth();
   const { t } = useTranslation();
   const { canInstall, install } = usePwaInstall();
   const [projectRefreshKey, setProjectRefreshKey] = React.useState(0);
+  const [isDevMode, setIsDevMode] = React.useState(false);
+  const [devLoading, setDevLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    fetch('/api/dev/ping', { credentials: 'include' })
+      .then((r) => { if (r.ok) setIsDevMode(true); })
+      .catch(() => {});
+  }, []);
+
+  async function handleDevLogin() {
+    setDevLoading(true);
+    try {
+      const res = await fetch('/api/dev/login-seed', { method: 'POST', credentials: 'include' });
+      if (res.ok) window.location.reload();
+    } finally {
+      setDevLoading(false);
+    }
+  }
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: defaultFormValues,
@@ -104,23 +128,45 @@ function Calculator() {
                 )}
               </>
             ) : (
-              <Button onClick={loginWithGoogle} variant="outline" size="sm">
-                {t('sign_in')}
-              </Button>
+              <>
+                <Button onClick={loginWithGoogle} variant="outline" size="sm">
+                  {t('sign_in')}
+                </Button>
+                {isDevMode && (
+                  <Button
+                    onClick={handleDevLogin}
+                    disabled={devLoading}
+                    variant="outline"
+                    size="sm"
+                    className="border-dashed border-yellow-500/60 text-yellow-500 hover:bg-yellow-500/10 hover:text-yellow-400"
+                    title="Dev Login — usuario de seed"
+                  >
+                    {devLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FlaskConical className="h-4 w-4" />}
+                  </Button>
+                )}
+              </>
             )}
           </div>
           </div>
         </motion.header>
 
         <Tabs defaultValue="calculator" className="w-full">
-          <TabsList className="mb-7 grid h-auto w-full grid-cols-2 rounded-2xl border border-border/70 bg-card/95 p-1.5 print:hidden dark:border-white/10 dark:bg-card/70 sm:w-[420px]">
+          <TabsList className="mb-7 grid h-auto w-full grid-cols-4 rounded-2xl border border-border/70 bg-card/95 p-1.5 print:hidden dark:border-white/10 dark:bg-card/70 sm:w-[840px]">
             <TabsTrigger value="calculator" className="rounded-xl py-2.5 font-bold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg">
-              <CalculatorIcon className="mr-2 h-4 w-4" />
-              {t('tab_calculator')}
+              <CalculatorIcon className="mr-0 h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">{t('tab_calculator')}</span>
             </TabsTrigger>
             <TabsTrigger value="challenge" className="rounded-xl py-2.5 font-bold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg">
-              <BarChart3 className="mr-2 h-4 w-4" />
-              {t('tab_tracker')}
+              <BarChart3 className="mr-0 h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">{t('tab_tracker')}</span>
+            </TabsTrigger>
+            <TabsTrigger value="statistics" className="rounded-xl py-2.5 font-bold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg">
+              <LineChart className="mr-0 h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">{t('tab_statistics')}</span>
+            </TabsTrigger>
+            <TabsTrigger value="inventory" className="rounded-xl py-2.5 font-bold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg">
+              <Package className="mr-0 h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">{t('tab_inventory')}</span>
             </TabsTrigger>
           </TabsList>
 
@@ -133,7 +179,7 @@ function Calculator() {
             >
               <TrackerGalaxyBackground />
               <div className="relative z-10 space-y-7 p-3 sm:p-4 cost-shell">
-                <section className="cost-hero rounded-[26px] border border-border/70 p-7 dark:border-white/[0.10] sm:p-8">
+                <section className="cost-hero rounded-[26px] border border-border/70 p-4 dark:border-white/[0.10] sm:p-7 lg:p-8">
                   <div className="mb-1 inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/70 px-3 py-1.5 text-xs font-bold text-[hsl(var(--challenge-blue))] dark:border-white/[0.08] dark:bg-white/[0.04]">
                     <CalculatorIcon className="h-3.5 w-3.5" />
                     {t('calc_hero_badge')}
@@ -156,6 +202,37 @@ function Calculator() {
 
           <TabsContent value="challenge">
             <FilamentTracker />
+          </TabsContent>
+
+          <TabsContent value="statistics">
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35 }}
+              className="rounded-[32px] border border-border/70 bg-card/95 p-5 shadow-[0_18px_40px_rgba(2,8,23,0.10)] dark:border-white/10 dark:bg-card/70 dark:shadow-[0_24px_80px_rgba(0,0,0,0.28)] sm:p-6"
+            >
+              <Suspense fallback={
+                <div className="flex items-center justify-center py-20">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                </div>
+              }>
+                <StatsDashboard />
+              </Suspense>
+            </motion.div>
+          </TabsContent>
+
+          <TabsContent value="inventory">
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35 }}
+              className="rounded-[32px] border border-border/70 bg-card/95 p-5 shadow-[0_18px_40px_rgba(2,8,23,0.10)] dark:border-white/10 dark:bg-card/70 dark:shadow-[0_24px_80px_rgba(0,0,0,0.28)] sm:p-6"
+            >
+              <InventoryDashboard
+                userId={user?.id ?? null}
+                authLoading={authLoading}
+              />
+            </motion.div>
           </TabsContent>
         </Tabs>
       </div>

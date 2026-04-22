@@ -71,19 +71,31 @@ export async function apiGetPieces(projectId: string): Promise<FilamentPiece[]> 
 export async function apiCreatePiece(
   projectId: string,
   input: PieceInput,
-): Promise<{ id: string; totalCost: number }> {
+): Promise<{ id: string; totalCost: number; spoolRemainingG?: number }> {
   const time  = parseTimeBlock(input.timeText);
   const grams = parseGramBlock(input.gramText);
-  return apiFetch<{ id: string; totalCost: number }>(
+
+  const payload: Record<string, unknown> = {
+    ...input,
+    totalSecs:  time.totalSecs,
+    totalGrams: grams.totalGrams,
+    timeLines:  time.validLines,
+    gramLines:  grams.validLines,
+    imageUrl:   input.imageUrl ?? null,
+  };
+
+  // If multi-filament, omit legacy spoolId
+  if (input.filaments && input.filaments.length > 0) {
+    delete payload.spoolId;
+    payload.filaments = input.filaments;
+  } else {
+    payload.spoolId = input.spoolId ?? null;
+    delete payload.filaments;
+  }
+
+  return apiFetch<{ id: string; totalCost: number; spoolRemainingG?: number }>(
     `/api/tracker/projects/${projectId}/pieces`,
-    jsonRequest('POST', {
-      ...input,
-      totalSecs:  time.totalSecs,
-      totalGrams: grams.totalGrams,
-      timeLines:  time.validLines,
-      gramLines:  grams.validLines,
-      imageUrl:   input.imageUrl ?? null,
-    }),
+    jsonRequest('POST', payload),
   );
 }
 
@@ -94,16 +106,27 @@ export async function apiUpdatePiece(
 ): Promise<{ totalCost: number }> {
   const time  = parseTimeBlock(input.timeText);
   const grams = parseGramBlock(input.gramText);
+
+  const payload: Record<string, unknown> = {
+    ...input,
+    totalSecs:  time.totalSecs,
+    totalGrams: grams.totalGrams,
+    timeLines:  time.validLines,
+    gramLines:  grams.validLines,
+    imageUrl:   input.imageUrl ?? null,
+  };
+
+  if (input.filaments && input.filaments.length > 0) {
+    delete payload.spoolId;
+    payload.filaments = input.filaments;
+  } else {
+    payload.spoolId = input.spoolId ?? null;
+    delete payload.filaments;
+  }
+
   return apiFetch<{ totalCost: number }>(
     `/api/tracker/projects/${projectId}/pieces/${pieceId}`,
-    jsonRequest('PUT', {
-      ...input,
-      totalSecs:  time.totalSecs,
-      totalGrams: grams.totalGrams,
-      timeLines:  time.validLines,
-      gramLines:  grams.validLines,
-      imageUrl:   input.imageUrl ?? null,
-    }),
+    jsonRequest('PUT', payload),
   );
 }
 

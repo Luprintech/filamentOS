@@ -15,7 +15,6 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { usePdfCustomization, PdfCustomization, ProjectData } from '@/features/calculator/api/use-pdf-customization';
 import { 
-  Upload, 
   Palette, 
   Layout, 
   Eye, 
@@ -290,11 +289,9 @@ export function PdfCustomizer({ open, onOpenChange, projectData }: PdfCustomizer
                             </p>
                           </>
                         ) : (
-                          <>
-                            {isUploadingLogo ? (
-                              <Loader2 className="h-10 w-10 text-primary animate-spin" />
-                            ) : (
-                              <Upload className="h-10 w-10 text-muted-foreground" />
+                        <>
+                            {isUploadingLogo && (
+                              <Loader2 className="h-6 w-6 text-primary animate-spin" />
                             )}
                             <div className="text-center">
                               <p className="text-sm font-medium">

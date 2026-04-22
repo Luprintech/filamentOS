@@ -21,6 +21,7 @@ import type { TrackerPdfData } from '@/features/tracker/api/use-tracker-pdf';
 import type { EditingState, FilamentProject, TrackerView } from './filament-types';
 import type { PieceInput, ProjectInput } from './use-filament-storage';
 import { useTranslation } from 'react-i18next';
+import { useInventory } from '@/features/inventory/api/use-inventory';
 
 // ── Login gate ────────────────────────────────────────────────────────────────
 
@@ -28,8 +29,8 @@ function LoginPrompt() {
   const { loginWithGoogle } = useAuth();
   const { t } = useTranslation();
   return (
-    <div className="challenge-panel flex flex-col items-center justify-center gap-6 rounded-[24px] border border-white/[0.10] p-10 text-center">
-      <div className="challenge-gradient-text text-4xl font-black leading-none">{t('tracker_login_title')}</div>
+    <div className="challenge-panel flex flex-col items-center justify-center gap-6 rounded-[24px] border border-white/[0.10] p-6 sm:p-10 text-center">
+      <div className="challenge-gradient-text text-2xl font-black leading-none sm:text-4xl">{t('tracker_login_title')}</div>
       <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
         {t('tracker_login_text')}
       </p>
@@ -57,6 +58,9 @@ export function FilamentTracker() {
     activeProject, createProject, updateProject, deleteProject, selectProject,
     pieces, addPiece, updatePiece, deletePiece, reorderPieces,
   } = useFilamentStorage({ authLoading, userId: user?.id ?? null });
+
+  const { spools: allSpools } = useInventory({ authLoading, userId: user?.id ?? null });
+  const activeSpools = allSpools.filter((s) => s.status === 'active');
 
   const [view, setView]                 = useState<TrackerView>('manager');
   const [editingState, setEditingState] = useState<EditingState>({ mode: 'create' });
@@ -226,6 +230,7 @@ export function FilamentTracker() {
             onSave={handleSavePiece}
             onUpdate={handleUpdatePiece}
             onCancelEdit={() => setEditingState({ mode: 'create' })}
+            activeSpools={activeSpools}
           />
           <ChallengePieceList
             project={activeProject}
@@ -246,7 +251,7 @@ export function FilamentTracker() {
       </div>
 
       <Dialog open={!!editingProject} onOpenChange={(open) => !open && setEditingProject(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="w-full sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{t('tracker_edit_project')}</DialogTitle>
             <DialogDescription>

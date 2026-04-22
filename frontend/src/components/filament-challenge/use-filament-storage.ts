@@ -23,6 +23,9 @@ export interface PieceInput {
   timeText: string;
   gramText: string;
   imageUrl?: string | null;
+  spoolId?: string | null;
+  /** Filamentos multicolor (nuevo sistema) */
+  filaments?: import('./filament-types').PieceFilamentInput[];
 }
 
 export interface FilamentStorageOptions {
@@ -159,9 +162,9 @@ export function useFilamentStorage({ authLoading, userId }: FilamentStorageOptio
 
   // ── Piece CRUD ────────────────────────────────────────────────────────────────
 
-  const addPiece = useCallback(async (input: PieceInput) => {
+  const addPiece = useCallback(async (input: PieceInput): Promise<{ spoolRemainingG?: number } | undefined> => {
     if (!activeId || !userId) return;
-    const { id, totalCost } = await apiCreatePiece(activeId, input);
+    const { id, totalCost, spoolRemainingG } = await apiCreatePiece(activeId, input);
     // Optimistic: build the full piece locally from parsed data
     const { parseTimeBlock, parseGramBlock } = await import('./filament-storage');
     const time  = parseTimeBlock(input.timeText);
@@ -193,6 +196,7 @@ export function useFilamentStorage({ authLoading, userId }: FilamentStorageOptio
           }
         : project,
     ));
+    return spoolRemainingG !== undefined ? { spoolRemainingG } : undefined;
   }, [activeId, userId]);
 
   const updatePiece = useCallback(async (id: string, input: PieceInput) => {

@@ -215,7 +215,7 @@ function EmptyState({ onCreate }: EmptyStateProps) {
   const { t } = useTranslation();
   return (
     <div className="flex flex-col items-center gap-6 rounded-[24px] border border-dashed border-white/[0.12] bg-white/[0.02] px-8 py-16 text-center">
-      <div className="challenge-gradient-text text-5xl font-black leading-none">TRACKER</div>
+      <div className="challenge-gradient-text text-3xl font-black leading-none sm:text-5xl">TRACKER</div>
       <div className="space-y-1">
         <p className="font-bold text-foreground">{t('pm_empty_title')}</p>
         <p className="max-w-xs text-sm text-muted-foreground">

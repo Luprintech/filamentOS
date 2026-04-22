@@ -67,7 +67,7 @@ export function SavedProjectsDialog({ form, children }: SavedProjectsDialogProps
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="w-full sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{t('saved_projects')}</DialogTitle>
           <DialogDescription>

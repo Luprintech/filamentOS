@@ -102,6 +102,35 @@ export function useDeleteProject() {
 }
 
 /**
+ * Hook para actualizar un proyecto existente (imagen, nombre, datos)
+ */
+export function useUpdateProject() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Omit<Project, 'id' | 'createdAt'> }) => {
+      return await projectsApi.update(id, data);
+    },
+    onSuccess: (_result, { data }) => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      toast({
+        title: 'Proyecto actualizado',
+        description: `"${data.jobName}" se ha actualizado correctamente`,
+      });
+    },
+    onError: (error) => {
+      console.error('Error updating project:', error);
+      toast({
+        title: 'Error al actualizar',
+        description: 'No se pudo actualizar el proyecto. Inténtalo de nuevo.',
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+/**
  * Hook para obtener un proyecto específico por ID
  */
 export function useProject(projectId: string | null) {

@@ -14,7 +14,6 @@ import { useToast } from '@/hooks/use-toast';
 import { usePdfCustomization, PdfCustomization } from '@/features/calculator/api/use-pdf-customization';
 import { useTrackerPdf, TrackerPdfData } from '@/features/tracker/api/use-tracker-pdf';
 import { 
-  Upload, 
   Palette, 
   Eye, 
   Save, 
@@ -278,20 +277,18 @@ export function TrackerPdfCustomizer({ open, onOpenChange, trackerData }: Tracke
                         </>
                       ) : (
                         <>
-                          {isUploadingLogo ? (
-                            <Loader2 className="h-10 w-10 text-primary animate-spin" />
-                          ) : (
-                            <Upload className="h-10 w-10 text-muted-foreground" />
-                          )}
-                          <div className="text-center">
-                            <p className="text-sm font-medium">
-                              Arrastra tu logo aquí o haz click
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              PNG, JPG o SVG (max 2 MB)
-                            </p>
-                          </div>
-                        </>
+                            {isUploadingLogo && (
+                              <Loader2 className="h-6 w-6 text-primary animate-spin" />
+                            )}
+                            <div className="text-center">
+                              <p className="text-sm font-medium">
+                                Arrastra tu logo aquí o haz click
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                PNG, JPG o SVG (max 2 MB)
+                              </p>
+                            </div>
+                          </>
                       )}
                     </div>
 

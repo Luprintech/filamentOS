@@ -61,8 +61,8 @@ export function CostProjectsPanel({ form, refreshKey }: CostProjectsPanelProps) 
   }
 
   return (
-    <aside className="challenge-panel rounded-[26px] border border-border/70 p-6 shadow-[0_14px_40px_rgba(2,8,23,0.10)] dark:border-white/[0.12] dark:shadow-[0_18px_60px_rgba(0,0,0,0.22)] xl:sticky xl:top-4 xl:max-h-[820px]">
-      <div className="mb-5 border-b border-border/70 pb-4 dark:border-white/10">
+    <aside className="challenge-panel flex flex-col rounded-[26px] border border-border/70 p-6 shadow-[0_14px_40px_rgba(2,8,23,0.10)] dark:border-white/[0.12] dark:shadow-[0_18px_60px_rgba(0,0,0,0.22)] xl:sticky xl:top-4 xl:max-h-[820px] xl:overflow-hidden">
+      <div className="mb-5 shrink-0 border-b border-border/70 pb-4 dark:border-white/10">
         <h3 className="text-xl font-black tracking-tight text-foreground">{t('saved_projects')}</h3>
         <p className="mt-1.5 text-sm text-muted-foreground">
           {t('saved_projects_subtitle')}
@@ -70,7 +70,7 @@ export function CostProjectsPanel({ form, refreshKey }: CostProjectsPanelProps) 
       </div>
 
       {user && (
-        <div className="relative mb-5">
+        <div className="relative mb-5 shrink-0">
           <Search className={`pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground ${iconClass}`} />
           <Input
             value={query}
@@ -94,8 +94,8 @@ export function CostProjectsPanel({ form, refreshKey }: CostProjectsPanelProps) 
           {t('saved_projects_empty')}
         </div>
       ) : (
-        <div className="flex min-h-[420px] flex-col gap-4">
-          <div className="flex flex-col gap-4 xl:flex-1 xl:overflow-y-auto xl:pr-1.5">
+        <div className="min-h-0 flex-1 overflow-y-auto pr-1.5">
+          <div className="flex flex-col gap-4">
             {sortedProjects.map((project) => {
               const isActive = currentFormId === project.id;
               return (

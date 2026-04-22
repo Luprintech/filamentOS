@@ -15,7 +15,10 @@ dotenv.config();
 
 const PORT = parseInt(process.env.PORT || '3001', 10);
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:9002';
-const DB_PATH = process.env.DB_PATH ?? path.resolve(__dirname, '../../data.db');
+// Use || (not ??) so that DB_PATH='' (empty string in .env) also falls back to the default path.
+// With ??, an empty string would be passed to new Database('') which opens a temp SQLite
+// database that is deleted on close — losing all data on every server restart.
+const DB_PATH = process.env.DB_PATH || path.resolve(__dirname, '../../data.db');
 
 // ── Base de datos SQLite ───────────────────────────────────────────────────────
 const db = new Database(DB_PATH);
@@ -122,6 +125,17 @@ db.exec(`
     image_url   TEXT,
     created_at  TEXT DEFAULT (datetime('now'))
   );
+  CREATE TABLE IF NOT EXISTS tracker_piece_filaments (
+    id         TEXT PRIMARY KEY,
+    piece_id   TEXT NOT NULL REFERENCES tracker_pieces(id) ON DELETE CASCADE,
+    spool_id   TEXT REFERENCES filament_inventory(id) ON DELETE SET NULL,
+    color_hex  TEXT NOT NULL DEFAULT '#888888',
+    color_name TEXT NOT NULL DEFAULT '',
+    brand      TEXT NOT NULL DEFAULT '',
+    material   TEXT NOT NULL DEFAULT '',
+    grams      REAL NOT NULL DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
   CREATE TABLE IF NOT EXISTS sessions (
     sid        TEXT PRIMARY KEY,
     sess       TEXT NOT NULL,
@@ -145,9 +159,37 @@ db.exec(`
     created_at      TEXT DEFAULT (datetime('now')),
     updated_at      TEXT DEFAULT (datetime('now'))
   );
+  CREATE TABLE IF NOT EXISTS filament_inventory (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    brand        TEXT NOT NULL,
+    material     TEXT NOT NULL,
+    color        TEXT NOT NULL,
+    color_hex    TEXT NOT NULL DEFAULT '#cccccc',
+    total_grams  REAL NOT NULL DEFAULT 0,
+    remaining_g  REAL NOT NULL DEFAULT 0,
+    price        REAL NOT NULL DEFAULT 0,
+    notes        TEXT NOT NULL DEFAULT '',
+    status       TEXT NOT NULL DEFAULT 'active',
+    created_at   TEXT DEFAULT (datetime('now')),
+    updated_at   TEXT DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS user_custom_spool_options (
+    id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type    TEXT NOT NULL CHECK(type IN ('brand', 'material')),
+    value   TEXT NOT NULL,
+    UNIQUE(user_id, type, value)
+  );
 `);
 
 db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(Date.now());
+
+// ── Performance index for stats queries ──────────────────────────────────────
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_tracker_pieces_user_date
+  ON tracker_pieces(user_id, created_at);
+`);
 
 const trackerProjectColumns = db
   .prepare("PRAGMA table_info(tracker_projects)")
@@ -167,6 +209,47 @@ if (!trackerPieceColumns.some((column) => column.name === 'order_index')) {
 
 if (!trackerPieceColumns.some((column) => column.name === 'image_url')) {
   db.exec("ALTER TABLE tracker_pieces ADD COLUMN image_url TEXT");
+}
+
+// filament_inventory: add spool_id to tracker_pieces for deduction tracking
+if (!trackerPieceColumns.some((column) => column.name === 'spool_id')) {
+  db.exec("ALTER TABLE tracker_pieces ADD COLUMN spool_id TEXT");
+}
+
+// Ensure filament_inventory columns exist (future-proofing if schema changes)
+const inventoryColumns = db
+  .prepare("PRAGMA table_info(filament_inventory)")
+  .all() as { name: string }[];
+
+const inventoryColNames = new Set(inventoryColumns.map((c) => c.name));
+if (inventoryColNames.size > 0) {
+  // Table exists; check for any missing columns from schema evolution
+  if (!inventoryColNames.has('color_hex')) {
+    db.exec("ALTER TABLE filament_inventory ADD COLUMN color_hex TEXT NOT NULL DEFAULT '#cccccc'");
+  }
+  if (!inventoryColNames.has('notes')) {
+    db.exec("ALTER TABLE filament_inventory ADD COLUMN notes TEXT NOT NULL DEFAULT ''");
+  }
+}
+
+// Ensure tracker_piece_filaments table exists (migration for existing DBs)
+const trackerFilamentTables = db
+  .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='tracker_piece_filaments'")
+  .all() as { name: string }[];
+if (trackerFilamentTables.length === 0) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS tracker_piece_filaments (
+      id         TEXT PRIMARY KEY,
+      piece_id   TEXT NOT NULL REFERENCES tracker_pieces(id) ON DELETE CASCADE,
+      spool_id   TEXT REFERENCES filament_inventory(id) ON DELETE SET NULL,
+      color_hex  TEXT NOT NULL DEFAULT '#888888',
+      color_name TEXT NOT NULL DEFAULT '',
+      brand      TEXT NOT NULL DEFAULT '',
+      material   TEXT NOT NULL DEFAULT '',
+      grams      REAL NOT NULL DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
 }
 
 migrateLegacyDatabases();
@@ -362,6 +445,31 @@ app.get('/api/auth/logout', (req, res) => {
   req.logout(() => res.redirect(CLIENT_ORIGIN));
 });
 
+// ── Dev-only: login inmediato como usuario de seed ────────────────────────────
+// Solo activo fuera de producción. Permite saltar Google OAuth en desarrollo local.
+if (process.env.NODE_ENV !== 'production') {
+  // Ping — el frontend lo usa para saber si el botón Dev Login debe mostrarse
+  app.get('/api/dev/ping', (_req, res) => res.json({ dev: true }));
+
+  app.post('/api/dev/login-seed', (req, res) => {
+    const SEED_GOOGLE_ID = 'dev_seed_user_luprintech_001';
+    const seedUser = db.prepare('SELECT * FROM users WHERE google_id = ?')
+      .get(SEED_GOOGLE_ID) as DbUser | undefined;
+
+    if (!seedUser) {
+      res.status(404).json({
+        error: 'Usuario de seed no encontrado. Ejecuta primero: cd backend && npm run seed',
+      });
+      return;
+    }
+
+    req.login(seedUser, (err) => {
+      if (err) { res.status(500).json({ error: 'Error al iniciar sesión' }); return; }
+      res.json({ success: true, user: { id: seedUser.id, name: seedUser.name, email: seedUser.email } });
+    });
+  });
+}
+
 app.get('/api/auth/user', (req, res) => {
   if (!req.isAuthenticated()) {
     // Endpoint de estado de sesión para el frontend:
@@ -414,6 +522,21 @@ app.post('/api/projects', requireAuth, (req, res) => {
   ).run(id, user.id, data.jobName || 'Sin nombre', JSON.stringify(data));
 
   res.json({ id });
+});
+
+app.put('/api/projects/:id', requireAuth, (req, res) => {
+  const user = req.user as DbUser;
+  const data = req.body;
+
+  const result = db.prepare(
+    'UPDATE projects SET job_name = ?, data = ? WHERE id = ? AND user_id = ?'
+  ).run(data.jobName || 'Sin nombre', JSON.stringify(data), req.params.id, user.id);
+
+  if (result.changes === 0) {
+    res.status(404).json({ error: 'Proyecto no encontrado o sin permiso' });
+    return;
+  }
+  res.json({ id: req.params.id });
 });
 
 app.delete('/api/projects/:id', requireAuth, (req, res) => {
@@ -504,6 +627,18 @@ app.delete('/api/tracker/projects/:id', requireAuth, (req, res) => {
 
 // ── Tracker: piezas ───────────────────────────────────────────────────────────
 
+interface DbPieceFilament {
+  id: string; piece_id: string; spool_id: string | null;
+  color_hex: string; color_name: string; brand: string; material: string;
+  grams: number; created_at: string;
+}
+
+interface FilamentInput {
+  spoolId?: string | null;
+  colorHex: string; colorName: string; brand: string; material: string;
+  grams: number;
+}
+
 app.get('/api/tracker/projects/:projectId/pieces', requireAuth, (req, res) => {
   const user = req.user as DbUser;
   const rows = db
@@ -512,20 +647,43 @@ app.get('/api/tracker/projects/:projectId/pieces', requireAuth, (req, res) => {
       id: string; project_id: string; order_index: number; label: string; name: string;
       time_text: string; gram_text: string; total_secs: number;
       total_grams: number; total_cost: number; time_lines: number;
-      gram_lines: number; image_url: string | null; created_at: string;
+      gram_lines: number; image_url: string | null; spool_id: string | null; created_at: string;
     }[];
-  res.json(rows.map((r) => ({
+
+  const pieces = rows.map((r) => ({
     id: r.id, projectId: r.project_id, orderIndex: r.order_index, label: r.label, name: r.name,
     timeText: r.time_text, gramText: r.gram_text,
     totalSecs: r.total_secs, totalGrams: r.total_grams, totalCost: r.total_cost,
     timeLines: r.time_lines, gramLines: r.gram_lines,
     imageUrl: r.image_url ?? null,
-  })));
+    spoolId: r.spool_id ?? null,
+    filaments: [] as { id: string; pieceId: string; spoolId: string | null; colorHex: string; colorName: string; brand: string; material: string; grams: number }[],
+  }));
+
+  if (pieces.length > 0) {
+    const ids = pieces.map((p) => p.id);
+    const placeholders = ids.map(() => '?').join(',');
+    const filamentRows = db
+      .prepare(`SELECT * FROM tracker_piece_filaments WHERE piece_id IN (${placeholders}) ORDER BY created_at ASC`)
+      .all(...ids) as DbPieceFilament[];
+
+    const byPiece = new Map<string, typeof pieces[0]['filaments']>();
+    filamentRows.forEach((f) => {
+      if (!byPiece.has(f.piece_id)) byPiece.set(f.piece_id, []);
+      byPiece.get(f.piece_id)!.push({
+        id: f.id, pieceId: f.piece_id, spoolId: f.spool_id ?? null,
+        colorHex: f.color_hex, colorName: f.color_name,
+        brand: f.brand, material: f.material, grams: f.grams,
+      });
+    });
+    pieces.forEach((p) => { p.filaments = byPiece.get(p.id) ?? []; });
+  }
+
+  res.json(pieces);
 });
 
 app.post('/api/tracker/projects/:projectId/pieces', requireAuth, (req, res) => {
   const user = req.user as DbUser;
-  // Verify project belongs to user
   const project = db
     .prepare('SELECT price_per_kg FROM tracker_projects WHERE id=? AND user_id=?')
     .get(req.params.projectId, user.id) as { price_per_kg: number } | undefined;
@@ -535,13 +693,110 @@ app.post('/api/tracker/projects/:projectId/pieces', requireAuth, (req, res) => {
     .prepare('SELECT COALESCE(MAX(order_index), -1) + 1 as next_order FROM tracker_pieces WHERE project_id=? AND user_id=?')
     .get(req.params.projectId, user.id) as { next_order: number };
 
-  const { label, name, timeText='', gramText='', totalSecs=0, totalGrams=0, timeLines=0, gramLines=0, imageUrl=null } = req.body;
-  const totalCost = parseFloat((totalGrams * (project.price_per_kg / 1000)).toFixed(4));
+  const { label, name, timeText='', gramText='', totalSecs=0, timeLines=0, gramLines=0, imageUrl=null } = req.body;
+  const rawFilaments: FilamentInput[] = Array.isArray(req.body.filaments) ? req.body.filaments : [];
+  const legacyTotalGrams = parseFloat(req.body.totalGrams) || 0;
+  const legacySpoolId: string | null = req.body.spoolId ?? null;
+
   const id = crypto.randomUUID();
-  db.prepare(
-    'INSERT INTO tracker_pieces (id, project_id, user_id, order_index, label, name, time_text, gram_text, total_secs, total_grams, total_cost, time_lines, gram_lines, image_url) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
-  ).run(id, req.params.projectId, user.id, nextOrder.next_order, label, name, timeText, gramText, totalSecs, totalGrams, totalCost, timeLines, gramLines, imageUrl);
-  res.json({ id, totalCost });
+  const now = new Date().toISOString();
+  let totalGrams = 0;
+  let totalCost  = 0;
+  let spoolRemainingG: number | undefined;
+
+  if (rawFilaments.length > 0) {
+    // ── Multi-filament mode ────────────────────────────────────────────────────
+    totalGrams = rawFilaments.reduce((s, f) => s + (parseFloat(String(f.grams)) || 0), 0);
+
+    try {
+      const txn = db.transaction(() => {
+        let cost = 0;
+
+        // Insert piece first (cost = 0, updated at end)
+        db.prepare(
+          'INSERT INTO tracker_pieces (id, project_id, user_id, order_index, label, name, time_text, gram_text, total_secs, total_grams, total_cost, time_lines, gram_lines, image_url, spool_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+        ).run(id, req.params.projectId, user.id, nextOrder.next_order, label, name, timeText,
+          gramText || String(totalGrams), totalSecs, totalGrams, 0, timeLines, gramLines, imageUrl, null);
+
+        const insertF = db.prepare(
+          'INSERT INTO tracker_piece_filaments (id, piece_id, spool_id, color_hex, color_name, brand, material, grams, created_at) VALUES (?,?,?,?,?,?,?,?,?)'
+        );
+
+        for (const f of rawFilaments) {
+          const fg = parseFloat(String(f.grams)) || 0;
+          if (f.spoolId) {
+            const spool = db.prepare(
+              "SELECT remaining_g, price, total_grams FROM filament_inventory WHERE id=? AND user_id=? AND status='active'"
+            ).get(f.spoolId, user.id) as { remaining_g: number; price: number; total_grams: number } | undefined;
+
+            if (spool) {
+              const pricePerGram = spool.total_grams > 0 ? spool.price / spool.total_grams : project.price_per_kg / 1000;
+              cost += fg * pricePerGram;
+              db.prepare(
+                `UPDATE filament_inventory
+                 SET remaining_g = MAX(0, remaining_g - ?),
+                     status = CASE WHEN MAX(0, remaining_g - ?) <= 0 THEN 'finished' ELSE status END,
+                     updated_at = ?
+                 WHERE id = ? AND user_id = ?`
+              ).run(fg, fg, now, f.spoolId, user.id);
+              const upd = db.prepare('SELECT remaining_g FROM filament_inventory WHERE id=?').get(f.spoolId) as { remaining_g: number } | undefined;
+              if (upd) spoolRemainingG = upd.remaining_g;
+            } else {
+              cost += fg * (project.price_per_kg / 1000);
+            }
+          } else {
+            cost += fg * (project.price_per_kg / 1000);
+          }
+          insertF.run(crypto.randomUUID(), id, f.spoolId ?? null, f.colorHex || '#888888', f.colorName || '', f.brand || '', f.material || '', fg, now);
+        }
+
+        totalCost = parseFloat(cost.toFixed(4));
+        db.prepare('UPDATE tracker_pieces SET total_cost=? WHERE id=?').run(totalCost, id);
+        return totalCost;
+      });
+
+      totalCost = txn() as number;
+    } catch (e) {
+      res.status(400).json({ error: e instanceof Error ? e.message : 'Transaction failed' });
+      return;
+    }
+  } else {
+    // ── Legacy single-spool mode (backward compat) ────────────────────────────
+    totalGrams = legacyTotalGrams;
+    totalCost  = parseFloat((totalGrams * (project.price_per_kg / 1000)).toFixed(4));
+
+    if (legacySpoolId) {
+      try {
+        const txn = db.transaction(() => {
+          db.prepare(
+            'INSERT INTO tracker_pieces (id, project_id, user_id, order_index, label, name, time_text, gram_text, total_secs, total_grams, total_cost, time_lines, gram_lines, image_url, spool_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+          ).run(id, req.params.projectId, user.id, nextOrder.next_order, label, name, timeText, gramText, totalSecs, totalGrams, totalCost, timeLines, gramLines, imageUrl, legacySpoolId);
+
+          const dr = db.prepare(
+            `UPDATE filament_inventory
+             SET remaining_g = MAX(0, remaining_g - ?),
+                 status = CASE WHEN MAX(0, remaining_g - ?) = 0 THEN 'finished' ELSE status END,
+                 updated_at = ?
+             WHERE id = ? AND user_id = ? AND status = 'active'`
+          ).run(totalGrams, totalGrams, now, legacySpoolId, user.id);
+          if (dr.changes === 0) throw new Error('Spool not found or already finished');
+
+          const upd = db.prepare('SELECT remaining_g FROM filament_inventory WHERE id=?').get(legacySpoolId) as { remaining_g: number };
+          return upd.remaining_g;
+        });
+        spoolRemainingG = txn() as number;
+      } catch (e) {
+        res.status(400).json({ error: e instanceof Error ? e.message : 'Transaction failed' });
+        return;
+      }
+    } else {
+      db.prepare(
+        'INSERT INTO tracker_pieces (id, project_id, user_id, order_index, label, name, time_text, gram_text, total_secs, total_grams, total_cost, time_lines, gram_lines, image_url, spool_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+      ).run(id, req.params.projectId, user.id, nextOrder.next_order, label, name, timeText, gramText, totalSecs, totalGrams, totalCost, timeLines, gramLines, imageUrl, null);
+    }
+  }
+
+  res.json({ id, totalCost, ...(spoolRemainingG !== undefined ? { spoolRemainingG } : {}) });
 });
 
 app.post('/api/tracker/projects/:projectId/pieces/reorder', requireAuth, (req, res) => {
@@ -570,12 +825,64 @@ app.put('/api/tracker/projects/:projectId/pieces/:id', requireAuth, (req, res) =
     .get(req.params.projectId, user.id) as { price_per_kg: number } | undefined;
   if (!project) { res.status(404).json({ error: 'Proyecto no encontrado.' }); return; }
 
-  const { label, name, timeText='', gramText='', totalSecs=0, totalGrams=0, timeLines=0, gramLines=0, imageUrl=null } = req.body;
-  const totalCost = parseFloat((totalGrams * (project.price_per_kg / 1000)).toFixed(4));
-  const result = db.prepare(
-    'UPDATE tracker_pieces SET label=?, name=?, time_text=?, gram_text=?, total_secs=?, total_grams=?, total_cost=?, time_lines=?, gram_lines=?, image_url=? WHERE id=? AND user_id=?'
-  ).run(label, name, timeText, gramText, totalSecs, totalGrams, totalCost, timeLines, gramLines, imageUrl, req.params.id, user.id);
-  if (result.changes === 0) { res.status(404).json({ error: 'Pieza no encontrada.' }); return; }
+  const { label, name, timeText='', gramText='', totalSecs=0, timeLines=0, gramLines=0, imageUrl=null } = req.body;
+  const rawFilaments: FilamentInput[] = Array.isArray(req.body.filaments) ? req.body.filaments : [];
+  const legacyTotalGrams = parseFloat(req.body.totalGrams) || 0;
+  const now = new Date().toISOString();
+  let totalGrams = 0;
+  let totalCost  = 0;
+
+  if (rawFilaments.length > 0) {
+    totalGrams = rawFilaments.reduce((s, f) => s + (parseFloat(String(f.grams)) || 0), 0);
+
+    // Compute cost (no deduction on edit — only on create)
+    let cost = 0;
+    for (const f of rawFilaments) {
+      const fg = parseFloat(String(f.grams)) || 0;
+      if (f.spoolId) {
+        const spool = db.prepare('SELECT price, total_grams FROM filament_inventory WHERE id=?')
+          .get(f.spoolId) as { price: number; total_grams: number } | undefined;
+        cost += spool && spool.total_grams > 0
+          ? fg * (spool.price / spool.total_grams)
+          : fg * (project.price_per_kg / 1000);
+      } else {
+        cost += fg * (project.price_per_kg / 1000);
+      }
+    }
+    totalCost = parseFloat(cost.toFixed(4));
+
+    try {
+      db.transaction(() => {
+        const r = db.prepare(
+          'UPDATE tracker_pieces SET label=?, name=?, time_text=?, gram_text=?, total_secs=?, total_grams=?, total_cost=?, time_lines=?, gram_lines=?, image_url=?, spool_id=? WHERE id=? AND user_id=?'
+        ).run(label, name, timeText, gramText || String(totalGrams), totalSecs, totalGrams, totalCost, timeLines, gramLines, imageUrl, null, req.params.id, user.id);
+        if (r.changes === 0) throw new Error('PIECE_NOT_FOUND');
+
+        db.prepare('DELETE FROM tracker_piece_filaments WHERE piece_id=?').run(req.params.id);
+
+        const insertF = db.prepare(
+          'INSERT INTO tracker_piece_filaments (id, piece_id, spool_id, color_hex, color_name, brand, material, grams, created_at) VALUES (?,?,?,?,?,?,?,?,?)'
+        );
+        for (const f of rawFilaments) {
+          insertF.run(crypto.randomUUID(), req.params.id, f.spoolId ?? null, f.colorHex || '#888888', f.colorName || '', f.brand || '', f.material || '', parseFloat(String(f.grams)) || 0, now);
+        }
+      })();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Update failed';
+      res.status(msg === 'PIECE_NOT_FOUND' ? 404 : 400).json({ error: msg === 'PIECE_NOT_FOUND' ? 'Pieza no encontrada.' : msg });
+      return;
+    }
+  } else {
+    // Legacy mode
+    totalGrams = legacyTotalGrams;
+    const spoolId = req.body.spoolId;
+    totalCost = parseFloat((totalGrams * (project.price_per_kg / 1000)).toFixed(4));
+    const result = db.prepare(
+      'UPDATE tracker_pieces SET label=?, name=?, time_text=?, gram_text=?, total_secs=?, total_grams=?, total_cost=?, time_lines=?, gram_lines=?, image_url=?, spool_id=? WHERE id=? AND user_id=?'
+    ).run(label, name, timeText, gramText, totalSecs, totalGrams, totalCost, timeLines, gramLines, imageUrl, spoolId ?? null, req.params.id, user.id);
+    if (result.changes === 0) { res.status(404).json({ error: 'Pieza no encontrada.' }); return; }
+  }
+
   res.json({ success: true, totalCost });
 });
 
@@ -586,6 +893,165 @@ app.delete('/api/tracker/projects/:projectId/pieces/:id', requireAuth, (req, res
     .run(req.params.id, user.id);
   if (result.changes === 0) { res.status(404).json({ error: 'Pieza no encontrada.' }); return; }
   res.json({ success: true });
+});
+
+// ── Inventory: filament spools ────────────────────────────────────────────────
+
+interface DbSpool {
+  id: string;
+  user_id: string;
+  brand: string;
+  material: string;
+  color: string;
+  color_hex: string;
+  total_grams: number;
+  remaining_g: number;
+  price: number;
+  notes: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+function mapSpool(r: DbSpool) {
+  return {
+    id: r.id,
+    brand: r.brand,
+    material: r.material,
+    color: r.color,
+    colorHex: r.color_hex,
+    totalGrams: r.total_grams,
+    remainingG: r.remaining_g,
+    price: r.price,
+    notes: r.notes,
+    status: r.status as 'active' | 'finished',
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+function validateSpoolBody(body: Record<string, unknown>): string | null {
+  const { brand, material, color, totalGrams, remainingG, price } = body as {
+    brand?: unknown; material?: unknown; color?: unknown;
+    totalGrams?: unknown; remainingG?: unknown; price?: unknown;
+  };
+  if (!brand || typeof brand !== 'string' || !brand.trim()) return 'brand is required';
+  if (!material || typeof material !== 'string' || !material.trim()) return 'material is required';
+  if (!color || typeof color !== 'string' || !color.trim()) return 'color is required';
+  const tg = Number(totalGrams);
+  const rg = Number(remainingG);
+  const pr = Number(price);
+  if (isNaN(tg) || tg < 0) return 'totalGrams must be >= 0';
+  if (isNaN(rg) || rg < 0) return 'remainingG must be >= 0';
+  if (rg > tg) return 'remainingG cannot exceed totalGrams';
+  if (isNaN(pr) || pr < 0) return 'price must be >= 0';
+  return null;
+}
+
+// Guarda marca y material como opciones custom del usuario (INSERT OR IGNORE evita duplicados)
+function saveCustomSpoolOptions(userId: string, brand: string, material: string) {
+  const stmt = db.prepare(
+    `INSERT OR IGNORE INTO user_custom_spool_options (user_id, type, value) VALUES (?, ?, ?)`
+  );
+  stmt.run(userId, 'brand', brand.trim());
+  stmt.run(userId, 'material', material.trim());
+}
+
+// GET /api/inventory/spools — list user spools (active first)
+app.get('/api/inventory/spools', requireAuth, (req, res) => {
+  const user = req.user as DbUser;
+  const rows = db
+    .prepare(`SELECT * FROM filament_inventory WHERE user_id = ?
+              ORDER BY CASE WHEN status = 'active' THEN 0 ELSE 1 END ASC, created_at DESC`)
+    .all(user.id) as DbSpool[];
+  res.json(rows.map(mapSpool));
+});
+
+// POST /api/inventory/spools — create spool
+app.post('/api/inventory/spools', requireAuth, (req, res) => {
+  const user = req.user as DbUser;
+  const err = validateSpoolBody(req.body);
+  if (err) { res.status(400).json({ error: err }); return; }
+
+  const { brand, material, color, colorHex = '#cccccc', totalGrams, remainingG, price, notes = '' } = req.body;
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+  db.prepare(
+    `INSERT INTO filament_inventory
+       (id, user_id, brand, material, color, color_hex, total_grams, remaining_g, price, notes, status, created_at, updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,'active',?,?)`
+  ).run(id, user.id, brand.trim(), material.trim(), color.trim(), colorHex, Number(totalGrams), Number(remainingG), Number(price), notes, now, now);
+  saveCustomSpoolOptions(user.id, brand, material);
+  const spool = db.prepare('SELECT * FROM filament_inventory WHERE id=?').get(id) as DbSpool;
+  res.json(mapSpool(spool));
+});
+
+// PUT /api/inventory/spools/:id — update spool
+app.put('/api/inventory/spools/:id', requireAuth, (req, res) => {
+  const user = req.user as DbUser;
+  const err = validateSpoolBody(req.body);
+  if (err) { res.status(400).json({ error: err }); return; }
+
+  const { brand, material, color, colorHex = '#cccccc', totalGrams, remainingG, price, notes = '' } = req.body;
+  const now = new Date().toISOString();
+  const result = db.prepare(
+    `UPDATE filament_inventory
+     SET brand=?, material=?, color=?, color_hex=?, total_grams=?, remaining_g=?, price=?, notes=?, updated_at=?
+     WHERE id=? AND user_id=?`
+  ).run(brand.trim(), material.trim(), color.trim(), colorHex, Number(totalGrams), Number(remainingG), Number(price), notes, now, req.params.id, user.id);
+  if (result.changes === 0) { res.status(404).json({ error: 'Spool not found.' }); return; }
+  saveCustomSpoolOptions(user.id, brand, material);
+  const spool = db.prepare('SELECT * FROM filament_inventory WHERE id=?').get(req.params.id) as DbSpool;
+  res.json(mapSpool(spool));
+});
+
+// DELETE /api/inventory/spools/:id — delete spool
+app.delete('/api/inventory/spools/:id', requireAuth, (req, res) => {
+  const user = req.user as DbUser;
+  const result = db.prepare('DELETE FROM filament_inventory WHERE id=? AND user_id=?').run(req.params.id, user.id);
+  if (result.changes === 0) { res.status(404).json({ error: 'Spool not found.' }); return; }
+  res.json({ success: true });
+});
+
+// PATCH /api/inventory/spools/:id/deduct — manual deduction
+app.patch('/api/inventory/spools/:id/deduct', requireAuth, (req, res) => {
+  const user = req.user as DbUser;
+  const grams = Number(req.body?.grams);
+  if (isNaN(grams) || grams <= 0) { res.status(400).json({ error: 'grams must be > 0' }); return; }
+
+  const spool = db.prepare('SELECT * FROM filament_inventory WHERE id=? AND user_id=?').get(req.params.id, user.id) as DbSpool | undefined;
+  if (!spool) { res.status(404).json({ error: 'Spool not found.' }); return; }
+  if (spool.status === 'finished') { res.status(400).json({ error: 'Cannot deduct from a finished spool.' }); return; }
+
+  const newRemaining = Math.max(0, spool.remaining_g - grams);
+  const newStatus = newRemaining === 0 ? 'finished' : 'active';
+  const now = new Date().toISOString();
+  db.prepare(
+    `UPDATE filament_inventory SET remaining_g=?, status=?, updated_at=? WHERE id=?`
+  ).run(newRemaining, newStatus, now, req.params.id);
+  res.json({ remainingG: newRemaining, status: newStatus });
+});
+
+// PATCH /api/inventory/spools/:id/finish — mark as finished
+app.patch('/api/inventory/spools/:id/finish', requireAuth, (req, res) => {
+  const user = req.user as DbUser;
+  const now = new Date().toISOString();
+  const result = db.prepare(
+    `UPDATE filament_inventory SET status='finished', remaining_g=0, updated_at=? WHERE id=? AND user_id=?`
+  ).run(now, req.params.id, user.id);
+  if (result.changes === 0) { res.status(404).json({ error: 'Spool not found.' }); return; }
+  res.json({ success: true });
+});
+
+// GET /api/inventory/custom-options — get user's saved custom brands & materials
+app.get('/api/inventory/custom-options', requireAuth, (req, res) => {
+  const user = req.user as DbUser;
+  const rows = db
+    .prepare('SELECT type, value FROM user_custom_spool_options WHERE user_id = ? ORDER BY value ASC')
+    .all(user.id) as { type: string; value: string }[];
+  const brands = rows.filter((r) => r.type === 'brand').map((r) => r.value);
+  const materials = rows.filter((r) => r.type === 'material').map((r) => r.value);
+  res.json({ brands, materials });
 });
 
 // ── Parser regex G-code (sin IA) ──────────────────────────────────────────────
@@ -956,6 +1422,152 @@ app.post('/api/tracker/pdf/generate', requireAuth, async (req, res) => {
   }
 });
 
+// ── Stats ─────────────────────────────────────────────────────────────────────
+
+interface StatsQuery {
+  from?: string;
+  to?: string;
+  projectId?: string;
+  granularity?: string;
+}
+
+function isValidIsoDate(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}(T[\d:.Z+-]*)?$/.test(value);
+}
+
+// GET /api/stats
+app.get('/api/stats', requireAuth, (req, res) => {
+  const user = req.user as DbUser;
+  const { from, to, projectId = 'all', granularity = 'month' } = req.query as StatsQuery;
+
+  // Validation
+  if (from && !isValidIsoDate(from)) {
+    res.status(400).json({ error: 'Invalid from date. Use ISO format YYYY-MM-DD.' });
+    return;
+  }
+  if (to && !isValidIsoDate(to)) {
+    res.status(400).json({ error: 'Invalid to date. Use ISO format YYYY-MM-DD.' });
+    return;
+  }
+  if (!['day', 'week', 'month'].includes(granularity)) {
+    res.status(400).json({ error: "Invalid granularity. Use 'day', 'week', or 'month'." });
+    return;
+  }
+
+  const fromDate = from ?? '1970-01-01';
+  const toDate = to ?? new Date().toISOString().slice(0, 10);
+  const toDateEnd = toDate + 'T23:59:59';
+
+  // Summary query
+  const summaryRow = db.prepare(`
+    SELECT
+      COUNT(*) AS totalPieces,
+      COALESCE(SUM(total_grams), 0) AS totalGrams,
+      COALESCE(SUM(total_cost), 0) AS totalCost,
+      COALESCE(SUM(total_secs), 0) AS totalSecs
+    FROM tracker_pieces
+    WHERE user_id = ?
+      AND created_at >= ?
+      AND created_at <= ?
+      AND (? = 'all' OR project_id = ?)
+  `).get(user.id, fromDate, toDateEnd, projectId, projectId) as {
+    totalPieces: number;
+    totalGrams: number;
+    totalCost: number;
+    totalSecs: number;
+  };
+
+  // Project count (distinct projects in range)
+  const projectCountRow = db.prepare(`
+    SELECT COUNT(DISTINCT project_id) AS projectCount
+    FROM tracker_pieces
+    WHERE user_id = ?
+      AND created_at >= ?
+      AND created_at <= ?
+      AND (? = 'all' OR project_id = ?)
+  `).get(user.id, fromDate, toDateEnd, projectId, projectId) as { projectCount: number };
+
+  const avgCostPerPiece = summaryRow.totalPieces > 0
+    ? parseFloat((summaryRow.totalCost / summaryRow.totalPieces).toFixed(4))
+    : 0;
+
+  // Granularity format for strftime
+  const strftimeFormat = granularity === 'day'
+    ? '%Y-%m-%d'
+    : granularity === 'week'
+    ? '%Y-W%W'
+    : '%Y-%m';
+
+  // Time series query
+  const timeSeries = db.prepare(`
+    SELECT
+      strftime('${strftimeFormat}', created_at) AS period,
+      COUNT(*) AS pieces,
+      COALESCE(SUM(total_grams), 0) AS grams,
+      COALESCE(SUM(total_cost), 0) AS cost,
+      COALESCE(SUM(total_secs), 0) AS secs
+    FROM tracker_pieces
+    WHERE user_id = ?
+      AND created_at >= ?
+      AND created_at <= ?
+      AND (? = 'all' OR project_id = ?)
+    GROUP BY period
+    ORDER BY period ASC
+  `).all(user.id, fromDate, toDateEnd, projectId, projectId) as Array<{
+    period: string;
+    pieces: number;
+    grams: number;
+    cost: number;
+    secs: number;
+  }>;
+
+  // By-project query
+  const byProject = db.prepare(`
+    SELECT
+      tp.project_id AS projectId,
+      tpr.title AS title,
+      COUNT(*) AS pieces,
+      COALESCE(SUM(tp.total_grams), 0) AS grams,
+      COALESCE(SUM(tp.total_cost), 0) AS cost,
+      COALESCE(SUM(tp.total_secs), 0) AS secs
+    FROM tracker_pieces tp
+    LEFT JOIN tracker_projects tpr ON tpr.id = tp.project_id
+    WHERE tp.user_id = ?
+      AND tp.created_at >= ?
+      AND tp.created_at <= ?
+      AND (? = 'all' OR tp.project_id = ?)
+    GROUP BY tp.project_id
+    ORDER BY cost DESC
+  `).all(user.id, fromDate, toDateEnd, projectId, projectId) as Array<{
+    projectId: string;
+    title: string | null;
+    pieces: number;
+    grams: number;
+    cost: number;
+    secs: number;
+  }>;
+
+  res.json({
+    summary: {
+      totalPieces: summaryRow.totalPieces,
+      totalGrams: summaryRow.totalGrams,
+      totalCost: summaryRow.totalCost,
+      totalSecs: summaryRow.totalSecs,
+      avgCostPerPiece,
+      projectCount: projectCountRow.projectCount,
+    },
+    timeSeries,
+    byProject: byProject.map((r) => ({
+      projectId: r.projectId,
+      title: r.title ?? 'Unknown',
+      pieces: r.pieces,
+      grams: r.grams,
+      cost: r.cost,
+      secs: r.secs,
+    })),
+  });
+});
+
 // ── Producción ────────────────────────────────────────────────────────────────
 if (process.env.NODE_ENV === 'production') {
   const distPath = path.resolve(__dirname, '../../frontend/dist');
@@ -963,6 +1575,23 @@ if (process.env.NODE_ENV === 'production') {
   app.get('*', (_req, res) => res.sendFile(path.join(distPath, 'index.html')));
 }
 
-app.listen(PORT, () => {
-  console.log(`✓ Servidor Express en http://localhost:${PORT}`);
-});
+// ── Test helpers (solo en NODE_ENV=test) ─────────────────────────────────────
+if (process.env.NODE_ENV === 'test') {
+  app.post('/api/test/login', (req, res) => {
+    const { userId } = req.body as { userId: string };
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as DbUser | undefined;
+    if (!user) { res.status(404).json({ error: 'User not found' }); return; }
+    req.login(user, (err) => {
+      if (err) { res.status(500).json({ error: 'Session error' }); return; }
+      res.json({ ok: true, user });
+    });
+  });
+}
+
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    console.log(`✓ Servidor Express en http://localhost:${PORT}`);
+  });
+}
+
+export { app, db };
