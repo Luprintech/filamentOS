@@ -467,7 +467,22 @@ const uploadLogo = multer({
   },
 });
 
-app.use(cors({ origin: CLIENT_ORIGIN, credentials: true }));
+const allowedOrigins = [
+  CLIENT_ORIGIN,
+  'https://filamentos.luprintech.com',
+  'http://filamentos.luprintech.com',
+];
+app.use(cors({
+  origin: (origin, callback) => {
+    // Permitir peticiones sin origin (curl, mobile apps) y los orígenes conocidos.
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, origin || '*');
+    } else {
+      callback(new Error(`CORS: origin no permitido: ${origin}`));
+    }
+  },
+  credentials: true,
+}));
 app.use(express.json({ limit: '25mb' }));
 
 app.use(
@@ -2216,10 +2231,10 @@ app.get('/api/inventory/:spoolId/consumos', requireAuth, (req, res) => {
 // ── Producción ────────────────────────────────────────────────────────────────
 if (process.env.NODE_ENV === 'production') {
   const distPath = path.resolve(__dirname, '../../frontend/dist');
-  app.use('/assets', express.static(path.join(distPath, 'assets')));
-  app.use('/Logo.svg', express.static(path.join(distPath, 'Logo.svg')));
-  app.use('/manifest.json', express.static(path.join(distPath, 'manifest.json')));
+  // Servir todos los estáticos del build de Vite.
+  // express.static maneja correctamente MIME types (js, css, svg, png, json...).
   app.use(express.static(distPath));
+  // Fallback SPA: cualquier ruta no resuelta por estáticos devuelve index.html.
   app.get('*', (_req, res) => res.sendFile(path.join(distPath, 'index.html')));
 }
 
