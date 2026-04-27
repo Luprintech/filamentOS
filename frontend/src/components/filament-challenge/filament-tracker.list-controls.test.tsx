@@ -126,7 +126,6 @@ vi.mock('./challenge-piece-list', () => ({
 }));
 
 vi.mock('./tracker-print-summary', () => ({ TrackerPrintSummary: () => null }));
-vi.mock('./tracker-galaxy-background', () => ({ TrackerGalaxyBackground: () => null }));
 vi.mock('@/components/tracker-pdf-customizer', () => ({ TrackerPdfCustomizer: () => null }));
 vi.mock('./project-manager', () => ({
   ProjectManager: ({ onOpenProject }: { onOpenProject: (id: string) => void }) => (

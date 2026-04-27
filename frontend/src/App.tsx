@@ -25,7 +25,7 @@ import { CookieBanner } from '@/components/cookie-banner';
 import { PrivacyPolicyModal } from '@/components/privacy-policy-modal';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { FilamentTracker } from '@/components/filament-challenge/filament-tracker';
-import { TrackerGalaxyBackground } from '@/components/filament-challenge/tracker-galaxy-background';
+import { GlobalBackground } from '@/components/global-background';
 import { CostProjectsPanel } from '@/components/cost-projects-panel';
 import { LanguageSelector } from '@/components/language-selector';
 import { CurrencySelector } from '@/components/currency-selector';
@@ -132,12 +132,13 @@ function AppShell() {
 
   return (
     <main className="flex min-h-screen flex-col items-center px-4 pb-10 pt-6 sm:px-8 md:px-10">
+      <GlobalBackground />
       <div className="w-full max-w-[1400px]">
         <motion.header
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
-          className="mb-8 rounded-2xl border border-border/70 bg-card/95 p-4 shadow-[0_12px_36px_rgba(2,8,23,0.10)] backdrop-blur-md print:hidden dark:border-white/10 dark:bg-card/70 dark:shadow-[0_18px_60px_rgba(0,0,0,0.22)] sm:p-5"
+          className="mb-8 rounded-2xl border border-border/70 bg-card/60 p-4 shadow-[0_12px_36px_rgba(2,8,23,0.10)] backdrop-blur-md print:hidden dark:border-white/10 dark:shadow-[0_18px_60px_rgba(0,0,0,0.22)] sm:p-5"
         >
           <div className="flex items-center justify-between gap-3">
             {/* Logo y título */}
@@ -338,7 +339,7 @@ function AppShell() {
         </motion.header>
 
         <Tabs defaultValue="calculator" className="w-full">
-          <TabsList className="mb-7 grid h-auto w-full grid-cols-4 rounded-2xl border border-border/70 bg-card/95 p-1.5 print:hidden dark:border-white/10 dark:bg-card/70">
+          <TabsList className="mb-7 grid h-auto w-full grid-cols-4 rounded-2xl border border-border/70 bg-card/60 backdrop-blur-md p-1.5 print:hidden dark:border-white/10">
             <TabsTrigger value="calculator" className="rounded-xl py-2.5 font-bold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg">
               <CalculatorIcon className="mr-0 h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">{t('tab_calculator')}</span>
@@ -362,9 +363,8 @@ function AppShell() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35 }}
-              className="relative overflow-hidden rounded-[32px] border border-border/70 shadow-[0_18px_40px_rgba(2,8,23,0.10)] dark:border-white/10 dark:shadow-[0_24px_80px_rgba(0,0,0,0.28)]"
+              className="relative rounded-[32px] border border-border/70 bg-card/60 backdrop-blur-md shadow-[0_18px_40px_rgba(2,8,23,0.10)] dark:border-white/10 dark:shadow-[0_24px_80px_rgba(0,0,0,0.28)]"
             >
-              <TrackerGalaxyBackground />
               <div className="relative z-10 space-y-7 p-3 sm:p-4 cost-shell">
                 <section className="cost-hero rounded-[26px] border border-border/70 p-4 dark:border-white/[0.10] sm:p-7 lg:p-8">
                   <div className="mb-1 inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/70 px-3 py-1.5 text-xs font-bold text-[hsl(var(--challenge-blue))] dark:border-white/[0.08] dark:bg-white/[0.04]">
@@ -398,7 +398,7 @@ function AppShell() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35 }}
-              className="rounded-[32px] border border-border/70 bg-card/95 p-5 shadow-[0_18px_40px_rgba(2,8,23,0.10)] dark:border-white/10 dark:bg-card/70 dark:shadow-[0_24px_80px_rgba(0,0,0,0.28)] sm:p-6"
+              className="rounded-[32px] border border-border/70 bg-card/60 backdrop-blur-md p-5 shadow-[0_18px_40px_rgba(2,8,23,0.10)] dark:border-white/10 dark:shadow-[0_24px_80px_rgba(0,0,0,0.28)] sm:p-6"
             >
               <Suspense fallback={
                 <div className="flex items-center justify-center py-20">
@@ -415,7 +415,7 @@ function AppShell() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35 }}
-              className="rounded-[32px] border border-border/70 bg-card/95 p-5 shadow-[0_18px_40px_rgba(2,8,23,0.10)] dark:border-white/10 dark:bg-card/70 dark:shadow-[0_24px_80px_rgba(0,0,0,0.28)] sm:p-6"
+              className="rounded-[32px] border border-border/70 bg-card/60 backdrop-blur-md p-5 shadow-[0_18px_40px_rgba(2,8,23,0.10)] dark:border-white/10 dark:shadow-[0_24px_80px_rgba(0,0,0,0.28)] sm:p-6"
             >
               <InventoryDashboard
                 userId={user?.id ?? null}

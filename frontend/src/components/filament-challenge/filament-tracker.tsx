@@ -15,7 +15,6 @@ import { ChallengeForm } from './challenge-form';
 import { ChallengePieceList } from './challenge-piece-list';
 import type { PieceSortMode, PieceViewMode } from './challenge-piece-list';
 import { TrackerPrintSummary } from './tracker-print-summary';
-import { TrackerGalaxyBackground } from './tracker-galaxy-background';
 import { TrackerPdfCustomizer } from '@/components/tracker-pdf-customizer';
 import { computeProjectStats } from './filament-storage';
 import type { TrackerPdfData } from '@/features/tracker/api/use-tracker-pdf';
@@ -151,8 +150,7 @@ export function FilamentTracker() {
     return (
       <>
         <GuestBanner message="👀 Proyectos de ejemplo. Inicia sesión para crear y gestionar tus series reales." />
-        <div className="relative overflow-hidden rounded-[32px] print:hidden">
-          <TrackerGalaxyBackground />
+        <div className="relative print:hidden">
           <div className="relative z-10 p-1">
             <ProjectManager
               projects={projects}
@@ -184,8 +182,7 @@ export function FilamentTracker() {
     return (
       <>
         <GuestBanner message="👀 Proyecto de ejemplo. Inicia sesión para crear tus propias series y gestionar piezas." />
-        <div className="relative w-full overflow-hidden rounded-[32px]">
-          <TrackerGalaxyBackground />
+        <div className="relative w-full">
           <div className="relative z-10 print:hidden">
             <ChallengeHero
               project={activeProject}
@@ -310,8 +307,7 @@ export function FilamentTracker() {
   if (view === 'manager' || !activeProject) {
     return (
       <>
-        <div className="relative overflow-hidden rounded-[32px] print:hidden">
-          <TrackerGalaxyBackground />
+        <div className="relative print:hidden">
           <div className="relative z-10 p-1">
           <ProjectManager
             projects={projects}
@@ -336,8 +332,7 @@ export function FilamentTracker() {
   // ── Project view ──────────────────────────────────────────────────────────────
 
   return (
-    <div className="relative w-full animate-fade-in overflow-hidden rounded-[32px]">
-      <TrackerGalaxyBackground />
+    <div className="relative w-full animate-fade-in">
       <div className="relative z-10 print:hidden">
         <ChallengeHero
           project={activeProject}

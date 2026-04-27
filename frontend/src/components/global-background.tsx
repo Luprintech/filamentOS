@@ -9,14 +9,14 @@ const stars = Array.from({ length: 22 }, (_, index) => ({
   opacity: 0.25 + (index % 4) * 0.14,
 }));
 
-export function TrackerGalaxyBackground() {
+export function GlobalBackground() {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
 
   return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[32px] print:hidden">
+    <div className="pointer-events-none fixed inset-0 overflow-hidden z-[-1] print:hidden">
       <div
-        className="absolute inset-0"
+        className="absolute inset-0 transition-colors duration-700"
         style={{
           background: isDark
             ? `
