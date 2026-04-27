@@ -18,40 +18,9 @@ import { Plus, Trash2, X, UploadCloud, Loader2, Box, ChevronLeft, ChevronRight, 
 import { analyzeGcodeFile } from '@/features/calculator/api/analyze-gcode';
 import { Import3MFModal, type Import3MFResult } from '@/components/import-3mf-modal';
 import { ImageUpload } from '@/components/ui/image-upload';
+import { DatePicker } from '@/components/ui/date-picker';
 
 const trackerSelectClassName = 'h-10 w-full rounded-[12px] border border-border/60 bg-card/80 px-3 text-sm font-medium text-foreground shadow-sm ring-offset-background transition focus:ring-2 focus:ring-primary/20 focus:ring-offset-0 dark:border-white/[0.10] dark:bg-white/[0.04]';
-const trackerDateButtonClassName = 'challenge-input flex h-10 w-full items-center justify-between rounded-[12px] border border-border/60 bg-card/80 px-3 py-2 text-sm font-medium text-foreground shadow-sm outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/20 dark:border-white/[0.10] dark:bg-white/[0.04]';
-
-function formatDateLabel(value: string | null, locale: string): string {
-  if (!value) return 'Seleccionar fecha';
-  const date = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return 'Seleccionar fecha';
-  return new Intl.DateTimeFormat(locale || 'es-ES', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  }).format(date);
-}
-
-function getCalendarMatrix(monthDate: Date) {
-  const start = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-  const end = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
-  const startDay = (start.getDay() + 6) % 7;
-  const daysInMonth = end.getDate();
-  const cells: Array<Date | null> = [];
-
-  for (let i = 0; i < startDay; i++) cells.push(null);
-  for (let day = 1; day <= daysInMonth; day++) {
-    cells.push(new Date(monthDate.getFullYear(), monthDate.getMonth(), day));
-  }
-  while (cells.length % 7 !== 0) cells.push(null);
-
-  const weeks: Array<Array<Date | null>> = [];
-  for (let i = 0; i < cells.length; i += 7) {
-    weeks.push(cells.slice(i, i + 7));
-  }
-  return weeks;
-}
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -431,10 +400,7 @@ export function ChallengeForm({
   const [filamentRows, setFilamentRows]           = useState<FilamentRow[]>([emptyRow()]);
   const [filamentError, setFilamentError]         = useState('');
   const [materialRows, setMaterialRows]           = useState<MaterialRow[]>([]);
-  const [calendarOpen, setCalendarOpen]           = useState(false);
-  const [calendarMonth, setCalendarMonth]         = useState(() => new Date());
   const [isProcessingImage, setIsProcessingImage] = useState(false);
-  const calendarRef = useRef<HTMLDivElement>(null);
 
   // ── G-code / 3MF auto-fill ─────────────────────────────────────────────────
   const gcodeFileInputRef = useRef<HTMLInputElement>(null);
@@ -449,24 +415,6 @@ export function ChallengeForm({
   const plateCount = watch('plateCount') ?? 1;
   const derivedTimeText = `${parseInt(timeHours || '0', 10) || 0}h ${parseInt(timeMinutes || '0', 10) || 0}m 0s`;
   const previewTime = parseTimeBlock(derivedTimeText);
-  const calendarWeeks = getCalendarMatrix(calendarMonth);
-  const todayIso = (() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  })();
-
-  useEffect(() => {
-    if (!calendarOpen) return;
-
-    function handleClickOutside(event: MouseEvent) {
-      if (calendarRef.current && !calendarRef.current.contains(event.target as Node)) {
-        setCalendarOpen(false);
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [calendarOpen]);
 
   // Total grams and cost from filament rows
   const totalGrams = filamentRows.reduce((s, r) => s + (parseFloat(r.grams) || 0), 0);
@@ -868,81 +816,11 @@ export function ChallengeForm({
             <Label htmlFor="ch-printed-at" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               {t('tracker.printDate.title')}
             </Label>
-            <div className="relative" ref={calendarRef}>
-              <button
-                id="ch-printed-at"
-                type="button"
-                className={trackerDateButtonClassName}
-                onClick={() => setCalendarOpen((open) => !open)}
-              >
-                <span className={cn(!printedAt && 'text-muted-foreground')}>
-                  {formatDateLabel(printedAt || null, 'es-ES')}
-                </span>
-                <CalendarDays className="h-4 w-4 text-muted-foreground" />
-              </button>
-
-              {calendarOpen && (
-                <div className="absolute z-50 mt-2 w-full max-w-[280px] rounded-[16px] border border-border/60 bg-card/95 p-3 shadow-2xl backdrop-blur-md dark:border-white/[0.10] dark:bg-[#121826]/95">
-                  <div className="mb-2 flex items-center justify-between">
-                    <button type="button" className="rounded-full border border-border/60 p-1.5 hover:bg-accent dark:border-white/[0.10]" onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))}>
-                      <ChevronLeft className="h-3.5 w-3.5" />
-                    </button>
-                    <p className="text-xs font-bold text-foreground capitalize">
-                      {new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric' }).format(calendarMonth)}
-                    </p>
-                    <button type="button" className="rounded-full border border-border/60 p-1.5 hover:bg-accent dark:border-white/[0.10]" onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))}>
-                      <ChevronRight className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-
-                  <div className="mb-1 grid grid-cols-7 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((day) => <div key={day}>{day}</div>)}
-                  </div>
-
-                  <div className="space-y-1">
-                    {calendarWeeks.map((week, index) => (
-                      <div key={index} className="grid grid-cols-7 gap-1">
-                        {week.map((date, cellIndex) => {
-                          const iso = date
-                            ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-                            : null;
-                          const isSelected = iso === printedAt;
-                          const isToday = iso === todayIso;
-                          return date ? (
-                            <button
-                              key={cellIndex}
-                              type="button"
-                              onClick={() => handleSelectDate(date)}
-                              className={cn(
-                                'flex h-8 items-center justify-center rounded-[9px] text-xs font-semibold transition-colors',
-                                isSelected
-                                  ? 'bg-primary text-primary-foreground shadow'
-                                  : isToday
-                                    ? 'border border-primary/40 bg-primary/10 text-foreground hover:bg-primary/15'
-                                    : 'hover:bg-accent text-foreground'
-                              )}
-                            >
-                              {date.getDate()}
-                            </button>
-                          ) : (
-                            <div key={cellIndex} className="h-9" />
-                          );
-                        })}
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="mt-3 flex justify-between gap-2">
-                    <Button type="button" variant="outline" size="sm" className="rounded-full px-3 text-[11px]" onClick={() => setValue('printedAt', '')}>
-                      Limpiar
-                    </Button>
-                    <Button type="button" variant="outline" size="sm" className="rounded-full px-3 text-[11px]" onClick={() => setCalendarOpen(false)}>
-                      Cerrar
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
+            <DatePicker
+              value={printedAt}
+              onChange={(val) => setValue('printedAt', val)}
+              placeholder={t('tracker.printDate.placeholder', 'Seleccionar fecha')}
+            />
           </div>
         </div>
 

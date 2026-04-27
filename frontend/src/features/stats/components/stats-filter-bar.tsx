@@ -2,6 +2,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { StatsFilters, Granularity, DatePreset } from '../types';
@@ -60,12 +61,12 @@ export function StatsFilterBar({ filters, onFiltersChange, projects }: StatsFilt
     onFiltersChange({ ...filters, from, to, preset });
   }
 
-  function handleFromChange(e: React.ChangeEvent<HTMLInputElement>) {
-    onFiltersChange({ ...filters, from: e.target.value, preset: 'custom' });
+  function handleFromChange(val: string) {
+    onFiltersChange({ ...filters, from: val, preset: 'custom' });
   }
 
-  function handleToChange(e: React.ChangeEvent<HTMLInputElement>) {
-    onFiltersChange({ ...filters, to: e.target.value, preset: 'custom' });
+  function handleToChange(val: string) {
+    onFiltersChange({ ...filters, to: val, preset: 'custom' });
   }
 
   function handleProjectChange(value: string) {
@@ -101,8 +102,7 @@ export function StatsFilterBar({ filters, onFiltersChange, projects }: StatsFilt
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <div className="flex flex-col gap-1.5">
           <Label className="text-xs text-muted-foreground">{t('stats_filter_from')}</Label>
-          <Input
-            type="date"
+          <DatePicker
             value={filters.from}
             onChange={handleFromChange}
             className="h-8 text-sm"
@@ -110,8 +110,7 @@ export function StatsFilterBar({ filters, onFiltersChange, projects }: StatsFilt
         </div>
         <div className="flex flex-col gap-1.5">
           <Label className="text-xs text-muted-foreground">{t('stats_filter_to')}</Label>
-          <Input
-            type="date"
+          <DatePicker
             value={filters.to}
             onChange={handleToChange}
             className="h-8 text-sm"

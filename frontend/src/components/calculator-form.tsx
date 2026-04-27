@@ -35,6 +35,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/auth-context";
 import { PdfCustomizer } from "@/components/pdf-customizer";
 import { LoginRequiredModal } from "@/components/login-required-modal";
+import { DatePicker } from "@/components/ui/date-picker";
 import { type ProjectData } from "@/features/calculator/api/use-pdf-customization";
 import {
   UploadCloud,
@@ -560,11 +561,10 @@ export function CalculatorForm({ form, onProjectSaved }: { form: UseFormReturn<F
                           <FormItem>
                             <FormLabel>{t('calc.printedAt.label')}</FormLabel>
                             <FormControl>
-                              <Input
+                              <DatePicker
                                 className={inputClass}
-                                type="date"
-                                {...field}
                                 value={field.value ?? ''}
+                                onChange={field.onChange}
                               />
                             </FormControl>
                             <FormMessage />
