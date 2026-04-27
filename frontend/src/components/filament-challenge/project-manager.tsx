@@ -13,6 +13,8 @@ import type { FilamentProject } from './filament-types';
 import type { ProjectInput } from './use-filament-storage';
 import { useTranslation } from 'react-i18next';
 import { useCurrency } from '@/context/currency-context';
+import { ImageUpload } from '@/components/ui/image-upload';
+import { compressImage } from '@/lib/utils';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -52,30 +54,20 @@ export function ProjectForm({ defaultValues, onSubmit, onCancel, submitLabel }: 
   }, [currency, defaultValues, setValue]);
 
   const coverImage = watch('coverImage');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [imageError, setImageError] = useState('');
 
-  async function resizeImageToDataUrl(file: File): Promise<string> {
-    const imageBitmap = await createImageBitmap(file);
-    const maxWidth = 1200;
-    const scale = Math.min(1, maxWidth / imageBitmap.width);
-    const width = Math.round(imageBitmap.width * scale);
-    const height = Math.round(imageBitmap.height * scale);
-
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error(t('pm_image_error'));
-
-    ctx.drawImage(imageBitmap, 0, 0, width, height);
-    return canvas.toDataURL('image/jpeg', 0.82);
-  }
-
-  async function handleCoverUpload(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const optimized = await resizeImageToDataUrl(file);
-    setValue('coverImage', optimized);
+  async function handleCoverUpload(file: File) {
+    try {
+      setIsProcessing(true);
+      setImageError('');
+      const optimized = await compressImage(file, 1200, 0.82);
+      setValue('coverImage', optimized);
+    } catch {
+      setImageError(t('pm_image_error'));
+    } finally {
+      setIsProcessing(false);
+    }
   }
 
   function handleValid(values: ProjectFormValues) {
@@ -114,15 +106,20 @@ export function ProjectForm({ defaultValues, onSubmit, onCancel, submitLabel }: 
         />
       </div>
 
-      <div className="space-y-2">
-        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-          {t('pm_cover')}
-        </Label>
-        <div className="flex items-start gap-3">
-          {coverImage ? (
-            <div className="overflow-hidden shrink-0 rounded-[14px] border border-white/[0.08] bg-black/20">
-              <img src={coverImage} alt="Vista previa de portada" className="h-20 w-20 object-cover" />
-            </div>
+      <ImageUpload
+        imagePreview={coverImage || null}
+        isProcessing={isProcessing}
+        error={imageError}
+        onFileSelect={handleCoverUpload}
+        onClear={() => setValue('coverImage', '')}
+        label={t('pm_cover')}
+        dragPrompt={t('tracker.upload.dragPrompt')}
+        dropPrompt={t('tracker.upload.dropPrompt')}
+        changeBtn={t('pm_cover_change')}
+        uploadBtn={t('pm_cover_upload')}
+        hint={t('pm_cover_hint')}
+        processingLabel={t('tracker.upload.processing')}
+      />
           ) : (
             <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-[14px] border border-dashed border-white/[0.18] bg-white/[0.03] text-muted-foreground">
               <span className="text-2xl">🖼️</span>

@@ -17,6 +17,7 @@ import type { Spool } from '@/features/inventory/types';
 import { Plus, Trash2, X, UploadCloud, Loader2, Box, ChevronLeft, ChevronRight, CalendarDays } from 'lucide-react';
 import { analyzeGcodeFile } from '@/features/calculator/api/analyze-gcode';
 import { Import3MFModal, type Import3MFResult } from '@/components/import-3mf-modal';
+import { ImageUpload } from '@/components/ui/image-upload';
 
 const trackerSelectClassName = 'h-10 w-full rounded-[12px] border border-border/60 bg-card/80 px-3 text-sm font-medium text-foreground shadow-sm ring-offset-background transition focus:ring-2 focus:ring-primary/20 focus:ring-offset-0 dark:border-white/[0.10] dark:bg-white/[0.04]';
 const trackerDateButtonClassName = 'challenge-input flex h-10 w-full items-center justify-between rounded-[12px] border border-border/60 bg-card/80 px-3 py-2 text-sm font-medium text-foreground shadow-sm outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/20 dark:border-white/[0.10] dark:bg-white/[0.04]';
@@ -432,9 +433,7 @@ export function ChallengeForm({
   const [materialRows, setMaterialRows]           = useState<MaterialRow[]>([]);
   const [calendarOpen, setCalendarOpen]           = useState(false);
   const [calendarMonth, setCalendarMonth]         = useState(() => new Date());
-  const [isDragActive, setIsDragActive]           = useState(false);
   const [isProcessingImage, setIsProcessingImage] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
 
   // ── G-code / 3MF auto-fill ─────────────────────────────────────────────────
@@ -495,9 +494,7 @@ export function ChallengeForm({
     setFilamentError('');
     setMaterialRows([]);
     setGcodeStatus({ kind: 'idle' });
-    setIsDragActive(false);
     setIsProcessingImage(false);
-    if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
   // ── G-code analysis ────────────────────────────────────────────────────────
@@ -694,13 +691,11 @@ export function ChallengeForm({
   async function processImageFile(file: File) {
     if (!isSupportedImageType(file)) {
       setImageError(t('tracker.upload.invalidFormat'));
-      setIsDragActive(false);
       return;
     }
 
     if (file.size > MAX_IMAGE_UPLOAD_SIZE) {
       setImageError(t('form_err_img_size'));
-      setIsDragActive(false);
       return;
     }
 
@@ -713,45 +708,7 @@ export function ChallengeForm({
       setImageError(t('form_err_img_process'));
     } finally {
       setIsProcessingImage(false);
-      setIsDragActive(false);
     }
-  }
-
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    await processImageFile(file);
-  }
-
-  function handleDragEnter(event: React.DragEvent<HTMLDivElement>) {
-    event.preventDefault();
-    event.stopPropagation();
-    setIsDragActive(true);
-  }
-
-  function handleDragOver(event: React.DragEvent<HTMLDivElement>) {
-    event.preventDefault();
-    event.stopPropagation();
-    event.dataTransfer.dropEffect = 'copy';
-    setIsDragActive(true);
-  }
-
-  function handleDragLeave(event: React.DragEvent<HTMLDivElement>) {
-    event.preventDefault();
-    event.stopPropagation();
-    setIsDragActive(false);
-  }
-
-  async function handleDrop(event: React.DragEvent<HTMLDivElement>) {
-    event.preventDefault();
-    event.stopPropagation();
-    const file = event.dataTransfer.files?.[0];
-    if (!file) {
-      setIsDragActive(false);
-      return;
-    }
-
-    await processImageFile(file);
   }
 
   // ── Submit ─────────────────────────────────────────────────────────────────
@@ -1183,51 +1140,21 @@ export function ChallengeForm({
         </div>
 
         {/* Image upload */}
-        <div className="space-y-2">
-          <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-            {t('form_image')} <span className="normal-case font-normal">{t('form_image_optional')}</span>
-          </Label>
-          <div
-            onDragEnter={handleDragEnter}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            className={cn(
-              'rounded-[18px] border-2 border-dashed p-4 transition-colors',
-              isDragActive ? 'border-primary bg-primary/5 cursor-copy' : 'border-white/[0.10] bg-white/[0.02]',
-              isProcessingImage && 'pointer-events-none opacity-80',
-            )}
-          >
-            <div className="flex items-start gap-3">
-              {imagePreview && (
-                <div className="relative shrink-0">
-                  <img src={imagePreview} alt={t('cf_image_preview')} className="h-20 w-20 rounded-[14px] object-cover border border-white/[0.12]" />
-                  <button
-                    type="button"
-                    onClick={() => { setImagePreview(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
-                    className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[0.65rem] font-black text-white shadow-md"
-                    aria-label={t('delete')}
-                  >✕</button>
-                </div>
-              )}
-              <div className="flex flex-1 flex-col gap-1.5">
-                <p className="text-sm font-semibold text-foreground">{t(isDragActive ? 'tracker.upload.dropPrompt' : 'tracker.upload.dragPrompt')}</p>
-                <Button type="button" variant="outline" size="sm" className="w-fit rounded-full text-xs font-bold" onClick={() => fileInputRef.current?.click()}>
-                  {imagePreview ? t('form_image_change') : t('form_image_upload')}
-                </Button>
-                <p className="text-[0.75rem] text-muted-foreground">{t('form_image_hint')}</p>
-                {isProcessingImage && (
-                  <div className="inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>{t('tracker.upload.processing')}</span>
-                  </div>
-                )}
-                {imageError && <p className="text-xs font-semibold text-destructive">{imageError}</p>}
-              </div>
-            </div>
-          </div>
-          <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleFileChange} />
-        </div>
+        <ImageUpload
+          imagePreview={imagePreview}
+          isProcessing={isProcessingImage}
+          error={imageError}
+          onFileSelect={processImageFile}
+          onClear={() => setImagePreview(null)}
+          label={t('form_image')}
+          optionalLabel={t('form_image_optional')}
+          dragPrompt={t('tracker.upload.dragPrompt')}
+          dropPrompt={t('tracker.upload.dropPrompt')}
+          changeBtn={t('form_image_change')}
+          uploadBtn={t('form_image_upload')}
+          hint={t('form_image_hint')}
+          processingLabel={t('tracker.upload.processing')}
+        />
 
         {/* Live cost preview */}
         <div className="rounded-[18px] border border-yellow-400/20 bg-yellow-400/8 p-4">
