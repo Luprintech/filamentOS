@@ -49,6 +49,7 @@ export interface Import3MFResult {
   projectName: string;
   filaments: FilamentRowData[];
   printTimeMinutes: number;
+  plateCount: number;
 }
 
 interface Import3MFModalProps {
@@ -194,7 +195,7 @@ export function Import3MFModal({ open, onClose, onConfirm, spools }: Import3MFMo
         spoolWeight: spool?.totalGrams ?? 1000,
       };
     });
-    onConfirm({ projectName, filaments, printTimeMinutes: totalMin });
+    onConfirm({ projectName, filaments, printTimeMinutes: totalMin, plateCount: included.length || 1 });
     onClose();
   }
 

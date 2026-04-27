@@ -117,6 +117,15 @@ export function useCalculatorActions({
     const dataToSave = JSON.parse(JSON.stringify(formData));
     delete dataToSave.id;
 
+    // calculator-stats: attach computed values so backend can store them in dedicated columns
+    dataToSave.printedAt = formData.printedAt || null;
+    dataToSave.totalCost = calculations.finalPrice;
+    dataToSave.totalGrams = formData.filaments?.length > 0
+      ? formData.filaments.reduce((s, f) => s + (f.grams || 0), 0)
+      : formData.filamentWeight;
+    dataToSave.totalSecs =
+      (formData.printingTimeHours * 3600) + (formData.printingTimeMinutes * 60);
+
     if (existingId) {
       // Proyecto cargado → actualizar en lugar de duplicar
       updateProjectMutation.mutate(

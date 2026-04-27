@@ -302,6 +302,30 @@ if (!trackerPieceColumns.some((column) => column.name === 'spool_id')) {
   db.exec("ALTER TABLE tracker_pieces ADD COLUMN spool_id TEXT");
 }
 
+// logbook-improvements: add plate_count and file_link columns
+if (!trackerPieceColumns.some((column) => column.name === 'plate_count')) {
+  db.exec("ALTER TABLE tracker_pieces ADD COLUMN plate_count INTEGER DEFAULT 1 NOT NULL");
+}
+
+if (!trackerPieceColumns.some((column) => column.name === 'file_link')) {
+  db.exec("ALTER TABLE tracker_pieces ADD COLUMN file_link TEXT DEFAULT NULL");
+}
+
+// calculator-stats: add printed_at, total_cost, total_grams, total_secs to projects table
+const projectColumns = db.prepare("PRAGMA table_info(projects)").all() as { name: string }[];
+if (!projectColumns.some(c => c.name === 'printed_at')) {
+  db.exec('ALTER TABLE projects ADD COLUMN printed_at TEXT DEFAULT NULL');
+}
+if (!projectColumns.some(c => c.name === 'total_cost')) {
+  db.exec('ALTER TABLE projects ADD COLUMN total_cost REAL NOT NULL DEFAULT 0');
+}
+if (!projectColumns.some(c => c.name === 'total_grams')) {
+  db.exec('ALTER TABLE projects ADD COLUMN total_grams REAL NOT NULL DEFAULT 0');
+}
+if (!projectColumns.some(c => c.name === 'total_secs')) {
+  db.exec('ALTER TABLE projects ADD COLUMN total_secs INTEGER NOT NULL DEFAULT 0');
+}
+
 // Ensure filament_inventory columns exist (future-proofing if schema changes)
 const inventoryColumns = db
   .prepare("PRAGMA table_info(filament_inventory)")
@@ -655,6 +679,14 @@ app.post('/api/projects', requireAuth, (req, res) => {
   const data = req.body;
   const id = crypto.randomUUID();
 
+  // calculator-stats: extract computed cost fields from request body
+  const { printedAt = null, totalCost = 0, totalGrams = 0, totalSecs = 0 } = req.body as {
+    printedAt?: string | null;
+    totalCost?: number;
+    totalGrams?: number;
+    totalSecs?: number;
+  };
+
   // spoolDeductions: Array<{ spoolId: string; grams: number }>
   const deductions: Array<{ spoolId: string; grams: number }> = Array.isArray(data.spoolDeductions) ? data.spoolDeductions : [];
   const warnings: string[] = [];
@@ -672,8 +704,17 @@ app.post('/api/projects', requireAuth, (req, res) => {
 
   const saveProject = db.transaction(() => {
     db.prepare(
-      'INSERT INTO projects (id, user_id, job_name, data) VALUES (?, ?, ?, ?)'
-    ).run(id, user.id, data.jobName || 'Sin nombre', JSON.stringify(data));
+      'INSERT INTO projects (id, user_id, job_name, data, printed_at, total_cost, total_grams, total_secs) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(
+      id,
+      user.id,
+      data.jobName || 'Sin nombre',
+      JSON.stringify(data),
+      printedAt || null,
+      parseFloat(String(totalCost)) || 0,
+      parseFloat(String(totalGrams)) || 0,
+      parseInt(String(totalSecs), 10) || 0,
+    );
 
     for (const d of deductions) {
       if (!d.spoolId || typeof d.grams !== 'number' || d.grams <= 0) continue;
@@ -699,9 +740,26 @@ app.put('/api/projects/:id', requireAuth, (req, res) => {
   const user = req.user as DbUser;
   const data = req.body;
 
+  // calculator-stats: also update the new columns on edit
+  const { printedAt = null, totalCost = 0, totalGrams = 0, totalSecs = 0 } = req.body as {
+    printedAt?: string | null;
+    totalCost?: number;
+    totalGrams?: number;
+    totalSecs?: number;
+  };
+
   const result = db.prepare(
-    'UPDATE projects SET job_name = ?, data = ? WHERE id = ? AND user_id = ?'
-  ).run(data.jobName || 'Sin nombre', JSON.stringify(data), req.params.id, user.id);
+    'UPDATE projects SET job_name = ?, data = ?, printed_at = ?, total_cost = ?, total_grams = ?, total_secs = ? WHERE id = ? AND user_id = ?'
+  ).run(
+    data.jobName || 'Sin nombre',
+    JSON.stringify(data),
+    printedAt || null,
+    parseFloat(String(totalCost)) || 0,
+    parseFloat(String(totalGrams)) || 0,
+    parseInt(String(totalSecs), 10) || 0,
+    req.params.id,
+    user.id,
+  );
 
   if (result.changes === 0) {
     res.status(404).json({ error: 'Proyecto no encontrado o sin permiso' });
@@ -834,7 +892,7 @@ app.get('/api/tracker/projects/:projectId/pieces', requireAuth, (req, res) => {
       id: string; project_id: string; order_index: number; label: string; name: string;
       time_text: string; gram_text: string; total_secs: number;
       total_grams: number; total_cost: number; time_lines: number;
-      gram_lines: number; image_url: string | null; notes: string; status: string; printed_at: string | null; incident: string; spool_id: string | null; created_at: string;
+      gram_lines: number; image_url: string | null; notes: string; status: string; printed_at: string | null; incident: string; spool_id: string | null; created_at: string; plate_count: number; file_link: string | null;
     }[];
 
   const pieces = rows.map((r) => ({
@@ -848,6 +906,8 @@ app.get('/api/tracker/projects/:projectId/pieces', requireAuth, (req, res) => {
     printedAt: r.printed_at ?? null,
     incident: r.incident,
     spoolId: r.spool_id ?? null,
+    plateCount: r.plate_count ?? 1,
+    fileLink: r.file_link ?? null,
     filaments: [] as { id: string; pieceId: string; spoolId: string | null; colorHex: string; colorName: string; brand: string; material: string; grams: number }[],
     materials: [] as { id: string; pieceId: string; name: string; quantity: number; cost: number }[],
   }));
@@ -902,11 +962,35 @@ app.post('/api/tracker/projects/:projectId/pieces', requireAuth, (req, res) => {
     .prepare('SELECT COALESCE(MAX(order_index), -1) + 1 as next_order FROM tracker_pieces WHERE project_id=? AND user_id=?')
     .get(req.params.projectId, user.id) as { next_order: number };
 
-  const { label, name, timeText = '', gramText = '', totalSecs = 0, timeLines = 0, gramLines = 0, imageUrl = null, notes = '', status = 'printed', printedAt = null, incident = '' } = req.body;
+  const { label, name, timeText = '', gramText = '', totalSecs = 0, timeLines = 0, gramLines = 0, imageUrl = null, notes = '', status = 'printed', printedAt = null, incident = '', plateCount = 1, fileLink = null } = req.body;
   const rawFilaments: FilamentInput[] = Array.isArray(req.body.filaments) ? req.body.filaments : [];
   const rawMaterials: MaterialInput[] = Array.isArray(req.body.materials) ? req.body.materials : [];
   const legacyTotalGrams = parseFloat(req.body.totalGrams) || 0;
   const legacySpoolId: string | null = req.body.spoolId ?? null;
+
+  // Validate plateCount ≥ 1
+  const parsedPlateCount = parseInt(String(plateCount), 10);
+  if (isNaN(parsedPlateCount) || parsedPlateCount < 1) {
+    res.status(400).json({ error: 'plate_count debe ser al menos 1' });
+    return;
+  }
+
+  // Validate fileLink (must be valid URL or null/empty)
+  let validatedFileLink: string | null = null;
+  if (fileLink && String(fileLink).trim() !== '') {
+    const urlStr = String(fileLink).trim();
+    try {
+      const url = new URL(urlStr);
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+        res.status(400).json({ error: 'file_link debe usar http o https' });
+        return;
+      }
+      validatedFileLink = urlStr;
+    } catch {
+      res.status(400).json({ error: 'file_link debe ser una URL válida' });
+      return;
+    }
+  }
 
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
@@ -925,9 +1009,9 @@ app.post('/api/tracker/projects/:projectId/pieces', requireAuth, (req, res) => {
 
         // Insert piece first (cost = 0, updated at end)
         db.prepare(
-          'INSERT INTO tracker_pieces (id, project_id, user_id, order_index, label, name, time_text, gram_text, total_secs, total_grams, total_cost, time_lines, gram_lines, image_url, spool_id, notes, status, printed_at, incident) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+          'INSERT INTO tracker_pieces (id, project_id, user_id, order_index, label, name, time_text, gram_text, total_secs, total_grams, total_cost, time_lines, gram_lines, image_url, spool_id, notes, status, printed_at, incident, plate_count, file_link) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
         ).run(id, req.params.projectId, user.id, nextOrder.next_order, label, name, timeText,
-          gramText || String(totalGrams), totalSecs, totalGrams, 0, timeLines, gramLines, imageUrl, null, String(notes), String(status), printedAt || null, String(incident));
+          gramText || String(totalGrams), totalSecs, totalGrams, 0, timeLines, gramLines, imageUrl, null, String(notes), String(status), printedAt || null, String(incident), parsedPlateCount, validatedFileLink);
 
         const insertF = db.prepare(
           'INSERT INTO tracker_piece_filaments (id, piece_id, spool_id, color_hex, color_name, brand, material, grams, created_at) VALUES (?,?,?,?,?,?,?,?,?)'
@@ -998,8 +1082,8 @@ app.post('/api/tracker/projects/:projectId/pieces', requireAuth, (req, res) => {
       try {
         const txn = db.transaction(() => {
           db.prepare(
-            'INSERT INTO tracker_pieces (id, project_id, user_id, order_index, label, name, time_text, gram_text, total_secs, total_grams, total_cost, time_lines, gram_lines, image_url, spool_id, notes, status, printed_at, incident) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
-          ).run(id, req.params.projectId, user.id, nextOrder.next_order, label, name, timeText, gramText, totalSecs, totalGrams, totalCost, timeLines, gramLines, imageUrl, legacySpoolId, String(notes), String(status), printedAt || null, String(incident));
+            'INSERT INTO tracker_pieces (id, project_id, user_id, order_index, label, name, time_text, gram_text, total_secs, total_grams, total_cost, time_lines, gram_lines, image_url, spool_id, notes, status, printed_at, incident, plate_count, file_link) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+          ).run(id, req.params.projectId, user.id, nextOrder.next_order, label, name, timeText, gramText, totalSecs, totalGrams, totalCost, timeLines, gramLines, imageUrl, legacySpoolId, String(notes), String(status), printedAt || null, String(incident), parsedPlateCount, validatedFileLink);
 
           const insertM = db.prepare(
             'INSERT INTO tracker_piece_materials (id, piece_id, name, quantity, cost, created_at) VALUES (?,?,?,?,?,?)'
@@ -1029,8 +1113,8 @@ app.post('/api/tracker/projects/:projectId/pieces', requireAuth, (req, res) => {
       }
     } else {
       db.prepare(
-        'INSERT INTO tracker_pieces (id, project_id, user_id, order_index, label, name, time_text, gram_text, total_secs, total_grams, total_cost, time_lines, gram_lines, image_url, spool_id, notes, status, printed_at, incident) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
-      ).run(id, req.params.projectId, user.id, nextOrder.next_order, label, name, timeText, gramText, totalSecs, totalGrams, totalCost, timeLines, gramLines, imageUrl, null, String(notes), String(status), printedAt || null, String(incident));
+        'INSERT INTO tracker_pieces (id, project_id, user_id, order_index, label, name, time_text, gram_text, total_secs, total_grams, total_cost, time_lines, gram_lines, image_url, spool_id, notes, status, printed_at, incident, plate_count, file_link) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+      ).run(id, req.params.projectId, user.id, nextOrder.next_order, label, name, timeText, gramText, totalSecs, totalGrams, totalCost, timeLines, gramLines, imageUrl, null, String(notes), String(status), printedAt || null, String(incident), parsedPlateCount, validatedFileLink);
 
       const insertM = db.prepare(
         'INSERT INTO tracker_piece_materials (id, piece_id, name, quantity, cost, created_at) VALUES (?,?,?,?,?,?)'
@@ -1072,10 +1156,34 @@ app.put('/api/tracker/projects/:projectId/pieces/:id', requireAuth, (req, res) =
     .get(req.params.projectId, user.id) as { price_per_kg: number } | undefined;
   if (!project) { res.status(404).json({ error: 'Proyecto no encontrado.' }); return; }
 
-  const { label, name, timeText = '', gramText = '', totalSecs = 0, timeLines = 0, gramLines = 0, imageUrl = null, notes = '', status = 'printed', printedAt = null, incident = '' } = req.body;
+  const { label, name, timeText = '', gramText = '', totalSecs = 0, timeLines = 0, gramLines = 0, imageUrl = null, notes = '', status = 'printed', printedAt = null, incident = '', plateCount = 1, fileLink = null } = req.body;
   const rawFilaments: FilamentInput[] = Array.isArray(req.body.filaments) ? req.body.filaments : [];
   const rawMaterials: MaterialInput[] = Array.isArray(req.body.materials) ? req.body.materials : [];
   const legacyTotalGrams = parseFloat(req.body.totalGrams) || 0;
+
+  // Validate plateCount ≥ 1
+  const parsedPlateCountPut = parseInt(String(plateCount), 10);
+  if (isNaN(parsedPlateCountPut) || parsedPlateCountPut < 1) {
+    res.status(400).json({ error: 'plate_count debe ser al menos 1' });
+    return;
+  }
+
+  // Validate fileLink (must be valid URL or null/empty)
+  let validatedFileLinkPut: string | null = null;
+  if (fileLink && String(fileLink).trim() !== '') {
+    const urlStr = String(fileLink).trim();
+    try {
+      const url = new URL(urlStr);
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+        res.status(400).json({ error: 'file_link debe usar http o https' });
+        return;
+      }
+      validatedFileLinkPut = urlStr;
+    } catch {
+      res.status(400).json({ error: 'file_link debe ser una URL válida' });
+      return;
+    }
+  }
   const now = new Date().toISOString();
   let totalGrams = 0;
   let totalCost = 0;
@@ -1103,8 +1211,8 @@ app.put('/api/tracker/projects/:projectId/pieces/:id', requireAuth, (req, res) =
     try {
       db.transaction(() => {
         const r = db.prepare(
-          'UPDATE tracker_pieces SET label=?, name=?, time_text=?, gram_text=?, total_secs=?, total_grams=?, total_cost=?, time_lines=?, gram_lines=?, image_url=?, spool_id=?, notes=?, status=?, printed_at=?, incident=? WHERE id=? AND user_id=?'
-        ).run(label, name, timeText, gramText || String(totalGrams), totalSecs, totalGrams, totalCost, timeLines, gramLines, imageUrl, null, String(notes), String(status), printedAt || null, String(incident), req.params.id, user.id);
+          'UPDATE tracker_pieces SET label=?, name=?, time_text=?, gram_text=?, total_secs=?, total_grams=?, total_cost=?, time_lines=?, gram_lines=?, image_url=?, spool_id=?, notes=?, status=?, printed_at=?, incident=?, plate_count=?, file_link=? WHERE id=? AND user_id=?'
+        ).run(label, name, timeText, gramText || String(totalGrams), totalSecs, totalGrams, totalCost, timeLines, gramLines, imageUrl, null, String(notes), String(status), printedAt || null, String(incident), parsedPlateCountPut, validatedFileLinkPut, req.params.id, user.id);
         if (r.changes === 0) throw new Error('PIECE_NOT_FOUND');
 
         db.prepare('DELETE FROM tracker_piece_filaments WHERE piece_id=?').run(req.params.id);
@@ -1136,8 +1244,8 @@ app.put('/api/tracker/projects/:projectId/pieces/:id', requireAuth, (req, res) =
     const spoolId = req.body.spoolId;
     totalCost = parseFloat((totalGrams * (project.price_per_kg / 1000) + materialCost).toFixed(4));
     const result = db.prepare(
-      'UPDATE tracker_pieces SET label=?, name=?, time_text=?, gram_text=?, total_secs=?, total_grams=?, total_cost=?, time_lines=?, gram_lines=?, image_url=?, spool_id=?, notes=?, status=?, printed_at=?, incident=? WHERE id=? AND user_id=?'
-    ).run(label, name, timeText, gramText, totalSecs, totalGrams, totalCost, timeLines, gramLines, imageUrl, spoolId ?? null, String(notes), String(status), printedAt || null, String(incident), req.params.id, user.id);
+      'UPDATE tracker_pieces SET label=?, name=?, time_text=?, gram_text=?, total_secs=?, total_grams=?, total_cost=?, time_lines=?, gram_lines=?, image_url=?, spool_id=?, notes=?, status=?, printed_at=?, incident=?, plate_count=?, file_link=? WHERE id=? AND user_id=?'
+    ).run(label, name, timeText, gramText, totalSecs, totalGrams, totalCost, timeLines, gramLines, imageUrl, spoolId ?? null, String(notes), String(status), printedAt || null, String(incident), parsedPlateCountPut, validatedFileLinkPut, req.params.id, user.id);
     if (result.changes === 0) { res.status(404).json({ error: 'Pieza no encontrada.' }); return; }
 
     db.prepare('DELETE FROM tracker_piece_materials WHERE piece_id=?').run(req.params.id);
@@ -1855,20 +1963,29 @@ app.get('/api/stats', requireAuth, (req, res) => {
   const toDate = to ?? new Date().toISOString().slice(0, 10);
   const toDateEnd = toDate + 'T23:59:59';
 
-  // Summary query
+  // Summary query — includes both tracker_pieces and calculator projects via UNION ALL
   const summaryRow = db.prepare(`
     SELECT
       COUNT(*) AS totalPieces,
       COALESCE(SUM(total_grams), 0) AS totalGrams,
       COALESCE(SUM(total_cost), 0) AS totalCost,
       COALESCE(SUM(total_secs), 0) AS totalSecs
-    FROM tracker_pieces
-    WHERE user_id = ?
-      AND created_at >= ?
-      AND created_at <= ?
+    FROM (
+      SELECT total_grams, total_cost, total_secs, project_id, status,
+        COALESCE(printed_at, created_at) AS eff_date
+      FROM tracker_pieces
+      WHERE user_id = ?
+      UNION ALL
+      SELECT total_grams, total_cost, total_secs, NULL as project_id, 'delivered' as status,
+        COALESCE(printed_at, created_at) AS eff_date
+      FROM projects
+      WHERE user_id = ?
+    ) AS combined
+    WHERE eff_date >= ?
+      AND eff_date <= ?
       AND (? = 'all' OR project_id = ?)
       AND (? = 'all' OR status = ?)
-  `).get(user.id, fromDate, toDateEnd, projectId, projectId, status, status) as {
+  `).get(user.id, user.id, fromDate, toDateEnd, projectId, projectId, status, status) as {
     totalPieces: number;
     totalGrams: number;
     totalCost: number;
@@ -1880,8 +1997,8 @@ app.get('/api/stats', requireAuth, (req, res) => {
     SELECT COUNT(DISTINCT project_id) AS projectCount
     FROM tracker_pieces
     WHERE user_id = ?
-      AND created_at >= ?
-      AND created_at <= ?
+      AND COALESCE(printed_at, created_at) >= ?
+      AND COALESCE(printed_at, created_at) <= ?
       AND (? = 'all' OR project_id = ?)
       AND (? = 'all' OR status = ?)
   `).get(user.id, fromDate, toDateEnd, projectId, projectId, status, status) as { projectCount: number };
@@ -1896,8 +2013,8 @@ app.get('/api/stats', requireAuth, (req, res) => {
       COUNT(*) AS count
     FROM tracker_pieces
     WHERE user_id = ?
-      AND created_at >= ?
-      AND created_at <= ?
+      AND COALESCE(printed_at, created_at) >= ?
+      AND COALESCE(printed_at, created_at) <= ?
       AND (? = 'all' OR project_id = ?)
       AND (? = 'all' OR status = ?)
     GROUP BY status
@@ -1929,23 +2046,32 @@ app.get('/api/stats', requireAuth, (req, res) => {
       ? '%Y-W%W'
       : '%Y-%m';
 
-  // Time series query
+  // Time series query — includes both tracker_pieces and calculator projects via UNION ALL
   const timeSeries = db.prepare(`
     SELECT
-      strftime('${strftimeFormat}', created_at) AS period,
+      strftime('${strftimeFormat}', eff_date) AS period,
       COUNT(*) AS pieces,
       COALESCE(SUM(total_grams), 0) AS grams,
       COALESCE(SUM(total_cost), 0) AS cost,
       COALESCE(SUM(total_secs), 0) AS secs
-    FROM tracker_pieces
-    WHERE user_id = ?
-      AND created_at >= ?
-      AND created_at <= ?
+    FROM (
+      SELECT total_grams, total_cost, total_secs, project_id, status,
+        COALESCE(printed_at, created_at) AS eff_date
+      FROM tracker_pieces
+      WHERE user_id = ?
+      UNION ALL
+      SELECT total_grams, total_cost, total_secs, NULL as project_id, 'delivered' as status,
+        COALESCE(printed_at, created_at) AS eff_date
+      FROM projects
+      WHERE user_id = ?
+    ) AS combined
+    WHERE eff_date >= ?
+      AND eff_date <= ?
       AND (? = 'all' OR project_id = ?)
       AND (? = 'all' OR status = ?)
     GROUP BY period
     ORDER BY period ASC
-  `).all(user.id, fromDate, toDateEnd, projectId, projectId, status, status) as Array<{
+  `).all(user.id, user.id, fromDate, toDateEnd, projectId, projectId, status, status) as Array<{
     period: string;
     pieces: number;
     grams: number;
@@ -1965,8 +2091,8 @@ app.get('/api/stats', requireAuth, (req, res) => {
     FROM tracker_pieces tp
     LEFT JOIN tracker_projects tpr ON tpr.id = tp.project_id
     WHERE tp.user_id = ?
-      AND tp.created_at >= ?
-      AND tp.created_at <= ?
+      AND COALESCE(tp.printed_at, tp.created_at) >= ?
+      AND COALESCE(tp.printed_at, tp.created_at) <= ?
       AND (? = 'all' OR tp.project_id = ?)
       AND (? = 'all' OR tp.status = ?)
     GROUP BY tp.project_id

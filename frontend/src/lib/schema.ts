@@ -36,6 +36,9 @@ export const formSchema = z.object({
   // == Multi-filament array (replaces legacy fields in new UI) ==
   filaments: z.array(filamentRowSchema).default([]),
 
+  // == Calculator stats: print date for stats inclusion ==
+  printedAt: z.string().optional().default(''),
+
   // == Optional Fields ==
   projectImage: z.string().optional(),
   currency: z.string().min(1, i18n.t('schema_currency_required')),

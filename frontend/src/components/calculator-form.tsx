@@ -556,6 +556,20 @@ export function CalculatorForm({ form, onProjectSaved }: { form: UseFormReturn<F
                             <FormMessage />
                           </FormItem>
                         )} />
+                        <FormField control={form.control} name="printedAt" render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t('calc.printedAt.label')}</FormLabel>
+                            <FormControl>
+                              <Input
+                                className={inputClass}
+                                type="date"
+                                {...field}
+                                value={field.value ?? ''}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
                         <div className="space-y-2">
                           <FormLabel>{t('cf_image')}</FormLabel>
                           <div className="flex items-center gap-4">

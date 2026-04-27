@@ -501,6 +501,29 @@ const de = {
   'tracker.gcode_partial': 'Einige Felder wurden ausgefüllt. Überprüfe die leeren Felder.',
   'tracker.gcode_empty': 'Keine Zeit- oder Filamentdaten in der Datei gefunden.',
   'tracker.gcode_error': 'Fehler beim Analysieren der G-Code-Datei.',
+  'tracker.plateCount.label': 'Anzahl der Druckplatten',
+  'tracker.plateCount.display': '{{count}} Platten',
+  'tracker.plateCount.invalid': 'Die Anzahl der Platten muss mindestens 1 sein',
+  'tracker.fileLink.label': 'Dateilink',
+  'tracker.fileLink.placeholder': 'https://beispiel.de/datei.3mf',
+  'tracker.fileLink.invalid': 'Ungültige URL. Verwende das Format: https://…',
+  'tracker.fileLink.open': 'Datei öffnen',
+  'tracker.upload.processing': 'Bild wird verarbeitet…',
+  'tracker.upload.dragPrompt': 'Ziehe ein Bild hierher oder klicke zum Auswählen',
+  'tracker.upload.dropPrompt': 'Bild hier ablegen',
+  'tracker.upload.invalidFormat': 'Nicht unterstütztes Format. Nutze JPG, PNG oder WebP.',
+  'tracker.sort.newest': 'Neueste zuerst',
+  'tracker.sort.oldest': 'Älteste zuerst',
+  'tracker.sort.nameAsc': 'Name A-Z',
+  'tracker.sort.nameDesc': 'Name Z-A',
+  'tracker.view.list': 'Liste',
+  'tracker.view.grid': 'Raster',
+  'tracker.search.placeholder': 'Nach Name oder Etikett suchen…',
+  'tracker.search.empty': 'Keine Ergebnisse für „{{query}}"',
+  'tracker.search.clear': 'Suche löschen',
+
+  // calculator-stats
+  'calc.printedAt.label': 'Druckdatum',
 };
 
 export default de;

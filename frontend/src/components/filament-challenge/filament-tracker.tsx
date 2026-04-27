@@ -13,6 +13,7 @@ import { ProjectForm, ProjectManager } from './project-manager';
 import { ChallengeHero } from './challenge-hero';
 import { ChallengeForm } from './challenge-form';
 import { ChallengePieceList } from './challenge-piece-list';
+import type { PieceSortMode, PieceViewMode } from './challenge-piece-list';
 import { TrackerPrintSummary } from './tracker-print-summary';
 import { TrackerGalaxyBackground } from './tracker-galaxy-background';
 import { TrackerPdfCustomizer } from '@/components/tracker-pdf-customizer';
@@ -93,6 +94,8 @@ export function FilamentTracker() {
   const [pdfCustomizerOpen, setPdfCustomizerOpen] = useState(false);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'printed' | 'post_processed' | 'delivered' | 'failed'>('all');
+  const [sortMode, setSortMode] = useState<PieceSortMode>('date-desc');
+  const [viewMode, setViewMode] = useState<PieceViewMode>('grid');
 
   function openPdfCustomizer() {
     setPdfCustomizerOpen(true);
@@ -210,6 +213,10 @@ export function FilamentTracker() {
                 onEdit={() => setLoginModalOpen(true)}
                 onDelete={() => setLoginModalOpen(true)}
                 onReorder={() => {}}
+                sortMode={sortMode}
+                onSortChange={setSortMode}
+                viewMode={viewMode}
+                onViewChange={setViewMode}
               />
             </div>
           </div>
@@ -376,6 +383,10 @@ export function FilamentTracker() {
             }}
             onDelete={handleDeletePiece}
             onReorder={reorderPieces}
+            sortMode={sortMode}
+            onSortChange={setSortMode}
+            viewMode={viewMode}
+            onViewChange={setViewMode}
           />
         </div>
       </div>

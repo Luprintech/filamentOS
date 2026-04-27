@@ -501,6 +501,29 @@ const fr = {
   'tracker.gcode_partial': 'Certains champs ont été remplis. Vérifiez les champs vides.',
   'tracker.gcode_empty': 'Aucune donnée de temps ou de filament trouvée dans le fichier.',
   'tracker.gcode_error': 'Erreur lors de l\'analyse du fichier G-code.',
+  'tracker.plateCount.label': 'Nombre de plateaux',
+  'tracker.plateCount.display': '{{count}} plateaux',
+  'tracker.plateCount.invalid': 'Le nombre de plateaux doit être au moins de 1',
+  'tracker.fileLink.label': 'Lien du fichier',
+  'tracker.fileLink.placeholder': 'https://exemple.fr/fichier.3mf',
+  'tracker.fileLink.invalid': 'URL invalide. Utilisez le format : https://…',
+  'tracker.fileLink.open': 'Ouvrir le fichier',
+  'tracker.upload.processing': 'Traitement de l’image…',
+  'tracker.upload.dragPrompt': 'Glissez une image ici ou cliquez pour la sélectionner',
+  'tracker.upload.dropPrompt': 'Déposez l’image ici',
+  'tracker.upload.invalidFormat': 'Format non pris en charge. Utilisez JPG, PNG ou WebP.',
+  'tracker.sort.newest': 'Plus récent',
+  'tracker.sort.oldest': 'Plus ancien',
+  'tracker.sort.nameAsc': 'Nom A-Z',
+  'tracker.sort.nameDesc': 'Nom Z-A',
+  'tracker.view.list': 'Liste',
+  'tracker.view.grid': 'Grille',
+  'tracker.search.placeholder': 'Rechercher par nom ou étiquette…',
+  'tracker.search.empty': 'Aucun résultat pour « {{query}} »',
+  'tracker.search.clear': 'Effacer la recherche',
+
+  // calculator-stats
+  'calc.printedAt.label': "Date d'impression",
 };
 
 export default fr;

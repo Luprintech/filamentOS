@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -52,16 +54,38 @@ function getCalendarMatrix(monthDate: Date) {
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-interface FormValues {
-  label: string;
-  name: string;
-  timeHours: string;
-  timeMinutes: string;
-  notes: string;
-  status: 'pending' | 'printed' | 'post_processed' | 'delivered' | 'failed';
-  printedAt: string;
-  incident: string;
+const SUPPORTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
+const MAX_IMAGE_UPLOAD_SIZE = 10 * 1024 * 1024;
+const IMAGE_COMPRESSION_MAX_PX = 600;
+const IMAGE_COMPRESSION_QUALITY = 0.6;
+
+function isValidUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
 }
+
+function isSupportedImageType(file: File): boolean {
+  return SUPPORTED_IMAGE_TYPES.includes(file.type as (typeof SUPPORTED_IMAGE_TYPES)[number]);
+}
+
+const formSchema = z.object({
+  label: z.string().trim().min(1, 'form_err_label'),
+  name: z.string().trim().min(1, 'form_err_name'),
+  timeHours: z.string(),
+  timeMinutes: z.string(),
+  notes: z.string(),
+  status: z.enum(['pending', 'printed', 'post_processed', 'delivered', 'failed']),
+  printedAt: z.string(),
+  incident: z.string(),
+  plateCount: z.coerce.number().int('tracker.plateCount.invalid').min(1, 'tracker.plateCount.invalid'),
+  fileLink: z.string().trim().refine((value) => value.length === 0 || isValidUrl(value), 'tracker.fileLink.invalid'),
+});
+
+type FormValues = z.input<typeof formSchema>;
 
 interface MaterialRow {
   key: string;
@@ -118,7 +142,11 @@ function rowFromSpool(spool: Spool): Partial<FilamentRow> {
 
 // ── Compress image ─────────────────────────────────────────────────────────────
 
-async function compressImage(file: File, maxPx = 900, quality = 0.75): Promise<string> {
+export async function compressImage(
+  file: File,
+  maxPx = IMAGE_COMPRESSION_MAX_PX,
+  quality = IMAGE_COMPRESSION_QUALITY,
+): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -390,7 +418,10 @@ export function ChallengeForm({
   const isEditing = editingState.mode === 'edit';
 
   const { register, handleSubmit, watch, reset, setValue, setError, formState: { errors } } =
-    useForm<FormValues>({ defaultValues: { label: '', name: '', timeHours: '0', timeMinutes: '0', notes: '', status: 'printed', printedAt: '', incident: '' } });
+    useForm<FormValues>({
+      resolver: zodResolver(formSchema),
+      defaultValues: { label: '', name: '', timeHours: '0', timeMinutes: '0', notes: '', status: 'printed', printedAt: '', incident: '', plateCount: 1, fileLink: '' },
+    });
 
   const [successMsg, setSuccessMsg]               = useState('');
   const [milestoneUnlocked, setMilestoneUnlocked] = useState<number | null>(null);
@@ -401,6 +432,8 @@ export function ChallengeForm({
   const [materialRows, setMaterialRows]           = useState<MaterialRow[]>([]);
   const [calendarOpen, setCalendarOpen]           = useState(false);
   const [calendarMonth, setCalendarMonth]         = useState(() => new Date());
+  const [isDragActive, setIsDragActive]           = useState(false);
+  const [isProcessingImage, setIsProcessingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
 
@@ -414,6 +447,7 @@ export function ChallengeForm({
   const timeHours = watch('timeHours') ?? '0';
   const timeMinutes = watch('timeMinutes') ?? '0';
   const printedAt = watch('printedAt') || '';
+  const plateCount = watch('plateCount') ?? 1;
   const derivedTimeText = `${parseInt(timeHours || '0', 10) || 0}h ${parseInt(timeMinutes || '0', 10) || 0}m 0s`;
   const previewTime = parseTimeBlock(derivedTimeText);
   const calendarWeeks = getCalendarMatrix(calendarMonth);
@@ -452,7 +486,7 @@ export function ChallengeForm({
   // ── Reset helpers ──────────────────────────────────────────────────────────
 
   function resetForm() {
-    reset({ label: '', name: '', timeHours: '0', timeMinutes: '0', notes: '', status: 'printed', printedAt: '', incident: '' });
+    reset({ label: '', name: '', timeHours: '0', timeMinutes: '0', notes: '', status: 'printed', printedAt: '', incident: '', plateCount: 1, fileLink: '' });
     setImagePreview(null);
     setImageError('');
     setSuccessMsg('');
@@ -461,6 +495,8 @@ export function ChallengeForm({
     setFilamentError('');
     setMaterialRows([]);
     setGcodeStatus({ kind: 'idle' });
+    setIsDragActive(false);
+    setIsProcessingImage(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
@@ -518,6 +554,7 @@ export function ChallengeForm({
     const m = totalMin % 60;
     setValue('timeHours', String(h));
     setValue('timeMinutes', String(m));
+    setValue('plateCount', result.plateCount, { shouldValidate: true });
 
     // Map filament rows
     if (result.filaments.length > 0) {
@@ -530,6 +567,7 @@ export function ChallengeForm({
         brand:     f.brand,
         material:  f.filamentType,
         grams:     String(f.grams),
+        spoolPrice: String(f.spoolPrice ?? 20),
       })));
     }
     setGcodeStatus({ kind: 'idle' });
@@ -552,6 +590,8 @@ export function ChallengeForm({
         setValue('notes', piece.notes ?? '');
         setValue('status', piece.status ?? 'printed');
         setValue('printedAt', piece.printedAt ? piece.printedAt.slice(0, 10) : '');
+        setValue('plateCount', piece.plate_count ?? 1);
+        setValue('fileLink', piece.file_link ?? '');
         if (piece.printedAt) {
           const date = new Date(`${piece.printedAt.slice(0, 10)}T00:00:00`);
           if (!Number.isNaN(date.getTime())) setCalendarMonth(date);
@@ -573,7 +613,7 @@ export function ChallengeForm({
             brand: f.brand,
             material: f.material,
             grams: String(f.grams),
-            spoolPrice: String(f.spoolPrice ?? 20),
+            spoolPrice: '20',
           })));
         } else {
           // Legacy piece: create one manual row from totalGrams
@@ -651,17 +691,67 @@ export function ChallengeForm({
 
   // ── Image ──────────────────────────────────────────────────────────────────
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) { setImageError(t('form_err_img_type')); return; }
-    if (file.size > 10 * 1024 * 1024)   { setImageError(t('form_err_img_size')); return; }
+  async function processImageFile(file: File) {
+    if (!isSupportedImageType(file)) {
+      setImageError(t('tracker.upload.invalidFormat'));
+      setIsDragActive(false);
+      return;
+    }
+
+    if (file.size > MAX_IMAGE_UPLOAD_SIZE) {
+      setImageError(t('form_err_img_size'));
+      setIsDragActive(false);
+      return;
+    }
+
     setImageError('');
+    setIsProcessingImage(true);
+
     try {
       setImagePreview(await compressImage(file));
     } catch {
       setImageError(t('form_err_img_process'));
+    } finally {
+      setIsProcessingImage(false);
+      setIsDragActive(false);
     }
+  }
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await processImageFile(file);
+  }
+
+  function handleDragEnter(event: React.DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragActive(true);
+  }
+
+  function handleDragOver(event: React.DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = 'copy';
+    setIsDragActive(true);
+  }
+
+  function handleDragLeave(event: React.DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragActive(false);
+  }
+
+  async function handleDrop(event: React.DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    const file = event.dataTransfer.files?.[0];
+    if (!file) {
+      setIsDragActive(false);
+      return;
+    }
+
+    await processImageFile(file);
   }
 
   // ── Submit ─────────────────────────────────────────────────────────────────
@@ -717,6 +807,8 @@ export function ChallengeForm({
       incident:  values.incident.trim(),
       filaments,
       materials,
+      plate_count: values.plateCount,
+      file_link: values.fileLink.trim() || null,
     };
 
     if (isEditing && editingId) {
@@ -749,8 +841,15 @@ export function ChallengeForm({
       )}
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
-        {/* Label + Name */}
+        {/* Name + Label */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="ch-name" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              {t('form_name')}
+            </Label>
+            <Input id="ch-name" placeholder={t('form_name_placeholder')} className="challenge-input" {...register('name')} />
+            {errors.name && <p className="text-xs font-semibold text-destructive">{errors.name.message}</p>}
+          </div>
           <div className="space-y-1.5">
             <Label htmlFor="ch-label" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               {t('form_label')}
@@ -758,12 +857,35 @@ export function ChallengeForm({
             <Input id="ch-label" placeholder={t('form_label_placeholder')} className="challenge-input" {...register('label')} />
             {errors.label && <p className="text-xs font-semibold text-destructive">{errors.label.message}</p>}
           </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label htmlFor="ch-name" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              {t('form_name')}
+            <Label htmlFor="ch-plate-count" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              {t('tracker.plateCount.label')}
             </Label>
-            <Input id="ch-name" placeholder={t('form_name_placeholder')} className="challenge-input" {...register('name')} />
-            {errors.name && <p className="text-xs font-semibold text-destructive">{errors.name.message}</p>}
+            <Input
+              id="ch-plate-count"
+              type="number"
+              min="1"
+              step="1"
+              className="challenge-input"
+              {...register('plateCount', { valueAsNumber: true })}
+            />
+            {errors.plateCount && <p className="text-xs font-semibold text-destructive">{t(String(errors.plateCount.message))}</p>}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="ch-file-link" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              {t('tracker.fileLink.label')}
+            </Label>
+            <Input
+              id="ch-file-link"
+              type="url"
+              placeholder={t('tracker.fileLink.placeholder')}
+              className="challenge-input"
+              {...register('fileLink')}
+            />
+            {errors.fileLink && <p className="text-xs font-semibold text-destructive">{t(String(errors.fileLink.message))}</p>}
           </div>
         </div>
 
@@ -1065,27 +1187,46 @@ export function ChallengeForm({
           <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
             {t('form_image')} <span className="normal-case font-normal">{t('form_image_optional')}</span>
           </Label>
-          <div className="flex items-start gap-3">
-            {imagePreview && (
-              <div className="relative shrink-0">
-                <img src={imagePreview} alt={t('cf_image_preview')} className="h-20 w-20 rounded-[14px] object-cover border border-white/[0.12]" />
-                <button
-                  type="button"
-                  onClick={() => { setImagePreview(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
-                  className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[0.65rem] font-black text-white shadow-md"
-                  aria-label={t('delete')}
-                >✕</button>
-              </div>
+          <div
+            onDragEnter={handleDragEnter}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={cn(
+              'rounded-[18px] border-2 border-dashed p-4 transition-colors',
+              isDragActive ? 'border-primary bg-primary/5 cursor-copy' : 'border-white/[0.10] bg-white/[0.02]',
+              isProcessingImage && 'pointer-events-none opacity-80',
             )}
-            <div className="flex flex-col gap-1.5">
-              <Button type="button" variant="outline" size="sm" className="rounded-full text-xs font-bold" onClick={() => fileInputRef.current?.click()}>
-                {imagePreview ? t('form_image_change') : t('form_image_upload')}
-              </Button>
-              <p className="text-[0.75rem] text-muted-foreground">{t('form_image_hint')}</p>
-              {imageError && <p className="text-xs font-semibold text-destructive">{imageError}</p>}
+          >
+            <div className="flex items-start gap-3">
+              {imagePreview && (
+                <div className="relative shrink-0">
+                  <img src={imagePreview} alt={t('cf_image_preview')} className="h-20 w-20 rounded-[14px] object-cover border border-white/[0.12]" />
+                  <button
+                    type="button"
+                    onClick={() => { setImagePreview(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                    className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[0.65rem] font-black text-white shadow-md"
+                    aria-label={t('delete')}
+                  >✕</button>
+                </div>
+              )}
+              <div className="flex flex-1 flex-col gap-1.5">
+                <p className="text-sm font-semibold text-foreground">{t(isDragActive ? 'tracker.upload.dropPrompt' : 'tracker.upload.dragPrompt')}</p>
+                <Button type="button" variant="outline" size="sm" className="w-fit rounded-full text-xs font-bold" onClick={() => fileInputRef.current?.click()}>
+                  {imagePreview ? t('form_image_change') : t('form_image_upload')}
+                </Button>
+                <p className="text-[0.75rem] text-muted-foreground">{t('form_image_hint')}</p>
+                {isProcessingImage && (
+                  <div className="inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>{t('tracker.upload.processing')}</span>
+                  </div>
+                )}
+                {imageError && <p className="text-xs font-semibold text-destructive">{imageError}</p>}
+              </div>
             </div>
           </div>
-          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+          <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleFileChange} />
         </div>
 
         {/* Live cost preview */}
@@ -1104,7 +1245,7 @@ export function ChallengeForm({
 
         {/* Actions */}
         <div className="flex flex-wrap gap-2 pt-1">
-          <Button type="submit" className="challenge-btn-primary rounded-full font-extrabold">
+          <Button type="submit" className="challenge-btn-primary rounded-full font-extrabold" disabled={isProcessingImage || isAnalyzing}>
             {isEditing ? t('form_save_changes') : t('form_save')}
           </Button>
           {isEditing && (

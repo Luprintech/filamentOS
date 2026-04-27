@@ -501,6 +501,29 @@ const pt = {
   'tracker.gcode_partial': 'Alguns campos foram preenchidos. Verifique os campos vazios.',
   'tracker.gcode_empty': 'Nenhum dado de tempo ou filamento encontrado no ficheiro.',
   'tracker.gcode_error': 'Erro ao analisar o ficheiro G-code.',
+  'tracker.plateCount.label': 'Quantidade de placas',
+  'tracker.plateCount.display': '{{count}} placas',
+  'tracker.plateCount.invalid': 'A quantidade de placas deve ser pelo menos 1',
+  'tracker.fileLink.label': 'Link do arquivo',
+  'tracker.fileLink.placeholder': 'https://exemplo.com/arquivo.3mf',
+  'tracker.fileLink.invalid': 'URL inválida. Use o formato: https://…',
+  'tracker.fileLink.open': 'Abrir arquivo',
+  'tracker.upload.processing': 'Processando imagem…',
+  'tracker.upload.dragPrompt': 'Arraste uma imagem aqui ou clique para selecionar',
+  'tracker.upload.dropPrompt': 'Solte a imagem aqui',
+  'tracker.upload.invalidFormat': 'Formato não suportado. Use JPG, PNG ou WebP.',
+  'tracker.sort.newest': 'Mais recente',
+  'tracker.sort.oldest': 'Mais antigo',
+  'tracker.sort.nameAsc': 'Nome A-Z',
+  'tracker.sort.nameDesc': 'Nome Z-A',
+  'tracker.view.list': 'Lista',
+  'tracker.view.grid': 'Grade',
+  'tracker.search.placeholder': 'Pesquisar por nome ou etiqueta…',
+  'tracker.search.empty': 'Sem resultados para "{{query}}"',
+  'tracker.search.clear': 'Limpar pesquisa',
+
+  // calculator-stats
+  'calc.printedAt.label': 'Data de impressão',
 };
 
 export default pt;

@@ -84,6 +84,10 @@ export interface FilamentPiece {
   /** Filamentos multicolor — vacío en piezas legacy */
   filaments: PieceFilament[];
   materials: PieceMaterial[];
+  /** Number of plates used for this piece (default: 1) */
+  plate_count: number;
+  /** Link to the 3MF or STL file (optional) */
+  file_link: string | null;
 }
 
 // ── Stats ────────────────────────────────────────────────────────────────────────

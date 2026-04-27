@@ -40,7 +40,7 @@ export function useStatsQuery(filters: StatsFilters) {
         status: filters.status,
         granularity: filters.granularity,
       }),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 0, // always refetch on mount so saved/updated pieces are reflected immediately
     enabled: Boolean(debouncedFrom) && Boolean(debouncedTo),
   });
 }

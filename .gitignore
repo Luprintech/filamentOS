@@ -7,9 +7,14 @@ node_modules/
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
+*.txt
 
 # testing
 /coverage
+coverage/
+backend/coverage/
+frontend/coverage/
+.atl/
 
 # build / producción
 frontend/dist

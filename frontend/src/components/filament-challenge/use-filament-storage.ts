@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   apiGetProjects, apiCreateProject, apiUpdateProject, apiDeleteProject,
   apiGetPieces, apiCreatePiece, apiUpdatePiece, apiDeletePiece, apiReorderPieces,
@@ -31,6 +32,10 @@ export interface PieceInput {
   /** Filamentos multicolor (nuevo sistema) */
   filaments?: import('./filament-types').PieceFilamentInput[];
   materials?: import('./filament-types').PieceMaterialInput[];
+  /** Number of plates (default: 1) */
+  plate_count?: number;
+  /** Link to file (optional) */
+  file_link?: string | null;
 }
 
 export interface FilamentStorageOptions {
@@ -54,6 +59,7 @@ function saveActiveId(id: string | null): void {
 // ── Hook ───────────────────────────────────────────────────────────────────────
 
 export function useFilamentStorage({ authLoading, userId }: FilamentStorageOptions) {
+  const queryClient = useQueryClient();
   const [projects, setProjects]   = useState<FilamentProject[]>([]);
   const [pieces, setPieces]       = useState<FilamentPiece[]>([]);
   const [activeId, setActiveId]   = useState<string | null>(loadActiveId);
@@ -211,6 +217,8 @@ export function useFilamentStorage({ authLoading, userId }: FilamentStorageOptio
         quantity: m.quantity,
         cost: m.cost,
       })),
+      plate_count: input.plate_count ?? 1,
+      file_link: input.file_link ?? null,
     };
     setPieces((prev) => [...prev, piece]);
     setProjects((prev) => prev.map((project) =>
@@ -224,8 +232,9 @@ export function useFilamentStorage({ authLoading, userId }: FilamentStorageOptio
           }
         : project,
     ));
+    void queryClient.invalidateQueries({ queryKey: ['stats'] });
     return spoolRemainingG !== undefined ? { spoolRemainingG } : undefined;
-  }, [activeId, userId]);
+  }, [activeId, userId, queryClient]);
 
   const updatePiece = useCallback(async (id: string, input: PieceInput) => {
     if (!activeId || !userId) return;
@@ -266,16 +275,18 @@ export function useFilamentStorage({ authLoading, userId }: FilamentStorageOptio
                 grams: f.grams,
                 spoolPrice: f.spoolPrice,
               })),
-              materials: (input.materials ?? []).map((m, idx) => ({
-                id: `optimistic-material-upd-${idx}`,
-                pieceId: id,
-                name: m.name,
-                quantity: m.quantity,
-                cost: m.cost,
-              })),
-            }
-          : p,
-      ),
+               materials: (input.materials ?? []).map((m, idx) => ({
+                 id: `optimistic-material-upd-${idx}`,
+                 pieceId: id,
+                 name: m.name,
+                 quantity: m.quantity,
+                 cost: m.cost,
+               })),
+               plate_count: input.plate_count ?? 1,
+               file_link: input.file_link ?? null,
+             }
+           : p,
+       ),
     );
     if (currentPiece) {
       setProjects((prev) => prev.map((project) =>
@@ -289,7 +300,8 @@ export function useFilamentStorage({ authLoading, userId }: FilamentStorageOptio
           : project,
       ));
     }
-  }, [activeId, userId, pieces]);
+    void queryClient.invalidateQueries({ queryKey: ['stats'] });
+  }, [activeId, userId, pieces, queryClient]);
 
   const deletePiece = useCallback(async (id: string) => {
     if (!activeId || !userId) return;
@@ -308,7 +320,8 @@ export function useFilamentStorage({ authLoading, userId }: FilamentStorageOptio
           }
         : project,
     ));
-  }, [activeId, pieces, userId]);
+    void queryClient.invalidateQueries({ queryKey: ['stats'] });
+  }, [activeId, pieces, userId, queryClient]);
 
   const reorderPieces = useCallback(async (orderedIds: string[]) => {
     if (!activeId || !userId) return;

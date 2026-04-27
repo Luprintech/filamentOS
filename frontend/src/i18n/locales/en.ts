@@ -521,6 +521,29 @@ const en = {
   'tracker.gcode_partial': 'Some fields were filled. Check the remaining empty ones.',
   'tracker.gcode_empty': 'No time or filament data found in the file.',
   'tracker.gcode_error': 'Error analysing the G-code file.',
+  'tracker.plateCount.label': 'Plate Count',
+  'tracker.plateCount.display': '{{count}} plates',
+  'tracker.plateCount.invalid': 'Plate count must be at least 1',
+  'tracker.fileLink.label': 'File Link',
+  'tracker.fileLink.placeholder': 'https://example.com/file.3mf',
+  'tracker.fileLink.invalid': 'Invalid URL. Use format: https://…',
+  'tracker.fileLink.open': 'Open file',
+  'tracker.upload.processing': 'Processing image…',
+  'tracker.upload.dragPrompt': 'Drag an image here or click to select',
+  'tracker.upload.dropPrompt': 'Drop image here',
+  'tracker.upload.invalidFormat': 'Unsupported format. Use JPG, PNG or WebP.',
+  'tracker.sort.newest': 'Newest',
+  'tracker.sort.oldest': 'Oldest',
+  'tracker.sort.nameAsc': 'Name A-Z',
+  'tracker.sort.nameDesc': 'Name Z-A',
+  'tracker.view.list': 'List',
+  'tracker.view.grid': 'Grid',
+  'tracker.search.placeholder': 'Search by name or label…',
+  'tracker.search.empty': 'No results for "{{query}}"',
+  'tracker.search.clear': 'Clear search',
+
+  // calculator-stats
+  'calc.printedAt.label': 'Print date',
 };
 
 export default en;

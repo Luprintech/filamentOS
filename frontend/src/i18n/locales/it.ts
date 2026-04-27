@@ -501,6 +501,29 @@ const it = {
   'tracker.gcode_partial': 'Alcuni campi sono stati compilati. Controlla i campi vuoti.',
   'tracker.gcode_empty': 'Nessun dato di tempo o filamento trovato nel file.',
   'tracker.gcode_error': 'Errore durante l\'analisi del file G-code.',
+  'tracker.plateCount.label': 'Numero di piatti',
+  'tracker.plateCount.display': '{{count}} piatti',
+  'tracker.plateCount.invalid': 'Il numero di piatti deve essere almeno 1',
+  'tracker.fileLink.label': 'Link del file',
+  'tracker.fileLink.placeholder': 'https://esempio.it/file.3mf',
+  'tracker.fileLink.invalid': 'URL non valido. Usa il formato: https://…',
+  'tracker.fileLink.open': 'Apri file',
+  'tracker.upload.processing': 'Elaborazione immagine…',
+  'tracker.upload.dragPrompt': 'Trascina un’immagine qui o fai clic per selezionarla',
+  'tracker.upload.dropPrompt': 'Rilascia qui l’immagine',
+  'tracker.upload.invalidFormat': 'Formato non supportato. Usa JPG, PNG o WebP.',
+  'tracker.sort.newest': 'Più recente',
+  'tracker.sort.oldest': 'Più vecchio',
+  'tracker.sort.nameAsc': 'Nome A-Z',
+  'tracker.sort.nameDesc': 'Nome Z-A',
+  'tracker.view.list': 'Elenco',
+  'tracker.view.grid': 'Griglia',
+  'tracker.search.placeholder': 'Cerca per nome o etichetta…',
+  'tracker.search.empty': 'Nessun risultato per "{{query}}"',
+  'tracker.search.clear': 'Cancella ricerca',
+
+  // calculator-stats
+  'calc.printedAt.label': 'Data di stampa',
 };
 
 export default it;

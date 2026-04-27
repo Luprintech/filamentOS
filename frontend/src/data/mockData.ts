@@ -132,6 +132,8 @@ export const mockTrackerPieces: FilamentPiece[] = [
     incident: '',
     filaments: [],
     materials: [],
+    plate_count: 1,
+    file_link: null,
   },
   {
     id: 'piece-2',
@@ -153,6 +155,8 @@ export const mockTrackerPieces: FilamentPiece[] = [
     incident: 'Se retiraron soportes manualmente.',
     filaments: [],
     materials: [],
+    plate_count: 2,
+    file_link: null,
   },
   {
     id: 'piece-3',
@@ -174,6 +178,8 @@ export const mockTrackerPieces: FilamentPiece[] = [
     incident: 'Warping en la base.',
     filaments: [],
     materials: [],
+    plate_count: 1,
+    file_link: null,
   },
 ];
 
