@@ -1,4 +1,13 @@
 services:
+  spoolman:
+    image: ghcr.io/donkie/spoolman:latest
+    container_name: spoolman
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:7912:7912"
+    volumes:
+      - spoolman_data:/home/app/.local/share/spoolman
+
   app:
     build: .
     image: filamentos
@@ -11,11 +20,13 @@ services:
     environment:
       - NODE_ENV=production
       - DB_PATH=/data/data.db
-      - SPOOLMAN_BASE_URL=${SPOOLMAN_BASE_URL:-}
+      - SPOOLMAN_BASE_URL=http://spoolman:7912
       - SPOOLMAN_TIMEOUT_MS=${SPOOLMAN_TIMEOUT_MS:-10000}
     volumes:
       - sqlite_data:/data
 
 volumes:
   sqlite_data:
+    driver: local
+  spoolman_data:
     driver: local
