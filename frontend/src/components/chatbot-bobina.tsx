@@ -25,6 +25,7 @@ import { getFaqsForLanguage, FAQCategory, FAQ } from '@/data/faqs';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/auth-context';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
 
 type View = 'categories' | 'questions' | 'answer' | 'contact';
 
@@ -56,10 +57,30 @@ function getCategoryIcon(icon: string) {
   }
 }
 
+function useContextualWelcome() {
+  const { t } = useTranslation();
+  const { pathname } = useLocation();
+
+  if (pathname.startsWith('/calculadora') || pathname.startsWith('/proyectos')) {
+    return t('chatbot_welcome_calculadora');
+  }
+  if (pathname.startsWith('/bitacora')) {
+    return t('chatbot_welcome_bitacora');
+  }
+  if (pathname.startsWith('/inventario')) {
+    return t('chatbot_welcome_inventario');
+  }
+  if (pathname.startsWith('/estadisticas')) {
+    return t('chatbot_welcome_estadisticas');
+  }
+  return t('chatbot_welcome');
+}
+
 export function ChatBotBobina() {
   const { t, i18n } = useTranslation();
   const { toast } = useToast();
   const { user, isAuthenticated, loginWithGoogle } = useAuth();
+  const welcomeMessage = useContextualWelcome();
   const [isOpen, setIsOpen] = useState(false);
   const [view, setView] = useState<View>('categories');
   const [selectedCategory, setSelectedCategory] = useState<FAQCategory | null>(null);
@@ -305,7 +326,7 @@ export function ChatBotBobina() {
                     </div>
                     <div className="flex-1">
                       <p className="text-sm leading-relaxed text-justify">
-                        {t('chatbot_welcome')}
+                        {welcomeMessage}
                       </p>
                     </div>
                   </div>
