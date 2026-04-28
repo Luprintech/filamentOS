@@ -157,17 +157,19 @@ function FilamentRowInput({ row, index, canDelete, activeSpools, currency, onCha
 
   const grams = parseFloat(row.grams) || 0;
 
-  // Compute per-row cost preview
+  // Compute per-row cost preview — spoolPrice always overrides inventory price
   let rowCost = 0;
   if (grams > 0) {
-    if (row.mode === 'spool' && row.spoolId) {
+    const overridePrice = parseFloat(row.spoolPrice);
+    if (!isNaN(overridePrice) && overridePrice > 0) {
+      rowCost = grams * (overridePrice / 1000);
+    } else if (row.mode === 'spool' && row.spoolId) {
       const spool = activeSpools.find((s) => s.id === row.spoolId);
       if (spool && spool.totalGrams > 0) {
         rowCost = grams * (spool.price / spool.totalGrams);
       }
     } else {
-      const manualPrice = parseFloat(row.spoolPrice) || 20;
-      rowCost = grams * (manualPrice / 1000);
+      rowCost = grams * (20 / 1000);
     }
   }
 
@@ -324,11 +326,33 @@ function FilamentRowInput({ row, index, canDelete, activeSpools, currency, onCha
                 min="0"
                 step="0.01"
                 value={row.spoolPrice}
-                onChange={(e) => onChange(row.key, { spoolPrice: e.target.value || '20' })}
+                onChange={(e) => onChange(row.key, { spoolPrice: e.target.value })}
+                onBlur={(e) => { if (!e.target.value) onChange(row.key, { spoolPrice: '20' }); }}
                 className="challenge-input h-8 text-sm pr-8"
               />
               <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[0.72rem] text-muted-foreground pointer-events-none">{currency}</span>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Price override for spool mode */}
+      {row.mode === 'spool' && (
+        <div className="space-y-1">
+          <Label className="text-[0.72rem] font-bold uppercase tracking-wider text-muted-foreground">
+            {t('tracker.filaments.manualPrice')}
+          </Label>
+          <div className="relative">
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={row.spoolPrice}
+              onChange={(e) => onChange(row.key, { spoolPrice: e.target.value })}
+              onBlur={(e) => { if (!e.target.value) onChange(row.key, { spoolPrice: '20' }); }}
+              className="challenge-input h-8 text-sm pr-8"
+            />
+            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[0.72rem] text-muted-foreground pointer-events-none">{currency}</span>
           </div>
         </div>
       )}
@@ -421,12 +445,16 @@ export function ChallengeForm({
     const totalCost  = filamentRows.reduce((s, r) => {
       const g = parseFloat(r.grams) || 0;
       if (g === 0) return s;
+      const overridePrice = parseFloat(r.spoolPrice);
+      if (!isNaN(overridePrice) && overridePrice > 0) {
+        return s + g * (overridePrice / 1000);
+      }
       if (r.mode === 'spool' && r.spoolId) {
         const spool = activeSpools.find((sp) => sp.id === r.spoolId);
         if (spool && spool.totalGrams > 0) return s + g * (spool.price / spool.totalGrams);
         return s;
       }
-      return s + g * ((parseFloat(r.spoolPrice) || 20) / 1000);
+      return s + g * (20 / 1000);
     }, 0);
   const totalMaterialCost = materialRows.reduce((sum, row) => sum + (parseFloat(row.cost) || 0), 0);
 
@@ -537,10 +565,7 @@ export function ChallengeForm({
         setValue('printedAt', piece.printedAt ? piece.printedAt.slice(0, 10) : '');
         setValue('plateCount', piece.plate_count ?? 1);
         setValue('fileLink', piece.file_link ?? '');
-        if (piece.printedAt) {
-          const date = new Date(`${piece.printedAt.slice(0, 10)}T00:00:00`);
-          if (!Number.isNaN(date.getTime())) setCalendarMonth(date);
-        }
+        // (calendarMonth sync removed — DatePicker manages its own month state)
         setValue('incident', piece.incident ?? '');
         setImagePreview(piece.imageUrl ?? null);
         setImageError('');
@@ -549,17 +574,23 @@ export function ChallengeForm({
         setFilamentError('');
 
         if (piece.filaments && piece.filaments.length > 0) {
-          setFilamentRows(piece.filaments.map((f) => ({
-            key: f.id,
-            mode: f.spoolId ? 'spool' : 'manual',
-            spoolId: f.spoolId ?? '',
-            colorHex: f.colorHex,
-            colorName: f.colorName,
-            brand: f.brand,
-            material: f.material,
-            grams: String(f.grams),
-            spoolPrice: '20',
-          })));
+          setFilamentRows(piece.filaments.map((f) => {
+            const spool = f.spoolId ? activeSpools.find((s) => s.id === f.spoolId) : undefined;
+            const spoolPrice = spool && spool.totalGrams > 0
+              ? String(((spool.price / spool.totalGrams) * 1000).toFixed(2))
+              : '20';
+            return {
+              key: f.id,
+              mode: f.spoolId ? 'spool' : 'manual',
+              spoolId: f.spoolId ?? '',
+              colorHex: f.colorHex,
+              colorName: f.colorName,
+              brand: f.brand,
+              material: f.material,
+              grams: String(f.grams),
+              spoolPrice,
+            };
+          }));
         } else {
           // Legacy piece: create one manual row from totalGrams
           setFilamentRows([{
@@ -627,7 +658,6 @@ export function ChallengeForm({
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     setValue('printedAt', `${year}-${month}-${day}`);
-    setCalendarOpen(false);
   }
 
   function handleDeleteMaterial(key: string) {
@@ -685,7 +715,7 @@ export function ChallengeForm({
       brand:     r.brand,
       material:  r.material,
       grams:     parseFloat(r.grams),
-      spoolPrice: r.mode === 'manual' ? (parseFloat(r.spoolPrice) || 20) : undefined,
+      spoolPrice: parseFloat(r.spoolPrice) || 20,
     }));
 
     const materials: PieceMaterialInput[] = materialRows

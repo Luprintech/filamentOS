@@ -38,23 +38,14 @@ interface ChallengeHeroProps {
   onPrint: () => void;
   onEditProject: () => void;
   onDeleteProject: () => void;
+  onViewPieces?: () => void;
+  onAddPiece?: () => void;
 }
 
-export function ChallengeHero({ project, pieces, onBack, onPrint, onEditProject, onDeleteProject }: ChallengeHeroProps) {
+export function ChallengeHero({ project, pieces, onBack, onPrint, onEditProject, onDeleteProject, onViewPieces, onAddPiece }: ChallengeHeroProps) {
   const { t } = useTranslation();
   const stats      = computeProjectStats(pieces, project);
   const isComplete = stats.totalPieces >= project.goal;
-  const byStatus = pieces.reduce(
-    (acc, piece) => {
-      if (piece.status === 'pending') acc.pending += 1;
-      if (piece.status === 'printed') acc.printed += 1;
-      if (piece.status === 'post_processed') acc.postProcessed += 1;
-      if (piece.status === 'delivered') acc.delivered += 1;
-      if (piece.status === 'failed') acc.failed += 1;
-      return acc;
-    },
-    { pending: 0, printed: 0, postProcessed: 0, delivered: 0, failed: 0 },
-  );
 
   return (
     <section className="challenge-hero relative mb-6 overflow-hidden rounded-[28px] border border-white/[0.10] p-6 sm:p-8">
@@ -77,26 +68,38 @@ export function ChallengeHero({ project, pieces, onBack, onPrint, onEditProject,
         {t('hero_badge')}
       </div>
 
-      <div className="mt-3 flex flex-col gap-4 md:flex-row md:items-center">
-        {project.coverImage && (
-          <div className="overflow-hidden rounded-[20px] border border-white/[0.10] bg-black/20 md:w-56">
-            <img
-              src={project.coverImage}
-              alt={`Portada de ${project.title}`}
-              className="h-40 w-full object-cover"
-            />
-          </div>
-        )}
-        <div>
-          <h2 className="challenge-gradient-text text-3xl font-black leading-none tracking-tight sm:text-4xl">
-            {project.title}
-          </h2>
-          {project.description && (
-            <p className="mt-1 text-base font-bold text-[hsl(var(--challenge-blue))] sm:text-lg">
-              {project.description}
-            </p>
+      <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center lg:flex-1">
+          {project.coverImage && (
+            <div className="overflow-hidden rounded-[20px] border border-white/[0.10] bg-black/20 md:w-56">
+              <img
+                src={project.coverImage}
+                alt={`Portada de ${project.title}`}
+                className="h-40 w-full object-cover"
+              />
+            </div>
           )}
+          <div>
+            <h2 className="challenge-gradient-text text-3xl font-black leading-none tracking-tight sm:text-4xl">
+              {project.title}
+            </h2>
+            {project.description && (
+              <p className="mt-1 text-base font-bold text-[hsl(var(--challenge-blue))] sm:text-lg">
+                {project.description}
+              </p>
+            )}
+          </div>
         </div>
+
+        {onAddPiece && (
+          <button
+            type="button"
+            onClick={onAddPiece}
+            className="challenge-btn-primary shrink-0 rounded-full px-5 py-3 text-sm font-extrabold sm:px-6"
+          >
+            {t('hero_add_piece')} +
+          </button>
+        )}
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -127,21 +130,16 @@ export function ChallengeHero({ project, pieces, onBack, onPrint, onEditProject,
         />
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        {[
-          { label: t('tracker.status.pending'), value: byStatus.pending },
-          { label: t('tracker.status.printed'), value: byStatus.printed },
-          { label: t('tracker.status.postProcessed'), value: byStatus.postProcessed },
-          { label: t('tracker.status.delivered'), value: byStatus.delivered },
-          { label: t('tracker.status.failed'), value: byStatus.failed },
-        ].map((item) => (
-          <div key={item.label} className="rounded-full border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-xs font-bold text-foreground">
-            {item.label}: <span className="text-[hsl(var(--challenge-blue))]">{item.value}</span>
-          </div>
-        ))}
-      </div>
-
       <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        {onViewPieces && (
+          <button
+            type="button"
+            onClick={onViewPieces}
+            className="rounded-full border border-[hsl(var(--challenge-blue))]/40 bg-[hsl(var(--challenge-blue))]/10 px-4 py-2 text-sm font-extrabold text-[hsl(var(--challenge-blue))] transition hover:bg-[hsl(var(--challenge-blue))]/20 sm:w-auto"
+          >
+            {t('hero_view_pieces')} →
+          </button>
+        )}
         <button
           type="button"
           onClick={onPrint}

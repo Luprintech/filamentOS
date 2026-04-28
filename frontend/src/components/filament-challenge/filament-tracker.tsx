@@ -253,16 +253,12 @@ export function FilamentTracker() {
     );
   }
 
-  // ── Handlers (async, fire-and-forget with optimistic UI) ─────────────────────
+  // ── Handlers ──────────────────────────────────────────────────────────────────
 
   async function handleCreateProject(input: ProjectInput) {
     await createProject(input);
     setView('project');
     setEditingState({ mode: 'create' });
-  }
-
-  function handlePreviewProject(id: string) {
-    selectProject(id);
   }
 
   function handleOpenProject(id: string) {
@@ -274,6 +270,21 @@ export function FilamentTracker() {
   function handleBack() {
     selectProject(null);
     setView('manager');
+    setEditingState({ mode: 'create' });
+  }
+
+  function handleBackToProject() {
+    setView('project');
+    setEditingState({ mode: 'create' });
+  }
+
+  function handleGoToPieces() {
+    setView('pieces');
+    setEditingState({ mode: 'create' });
+  }
+
+  function handleAddPiece() {
+    setView('pieces');
     setEditingState({ mode: 'create' });
   }
 
@@ -304,103 +315,15 @@ export function FilamentTracker() {
     handleBack();
   }
 
-  // ── Manager view ──────────────────────────────────────────────────────────────
+  // ── Shared dialogs (used by both 'project' and 'pieces' views) ───────────────
 
-  if (view === 'manager' || !activeProject) {
-    return (
-      <>
-        <div className="relative print:hidden">
-          <div className="relative z-10 p-1">
-          <ProjectManager
-            projects={projects}
-            activeProjectId={activeProject?.id ?? null}
-            onCreate={handleCreateProject}
-            onUpdate={updateProject}
-            onDelete={deleteProject}
-            onSelect={handlePreviewProject}
-            onOpenProject={handleOpenProject}
-          />
-          </div>
-        </div>
-        {activeProject && (
-          <div className="hidden print:block">
-            <TrackerPrintSummary project={activeProject} pieces={pieces} />
-          </div>
-        )}
-      </>
-    );
-  }
-
-  // ── Project view ──────────────────────────────────────────────────────────────
-
-  return (
-    <div className="relative w-full animate-fade-in">
-      <div className="relative z-10 print:hidden">
-        <ChallengeHero
-          project={activeProject}
-          pieces={pieces}
-          onBack={handleBack}
-          onPrint={openPdfCustomizer}
-          onEditProject={() => setEditingProject(activeProject)}
-          onDeleteProject={() => setDeleteTargetProject(activeProject)}
-        />
-
-        <div className="mb-4 flex flex-wrap justify-center gap-2">
-          {['all', 'pending', 'printed', 'post_processed', 'delivered', 'failed'].map((value) => (
-            <Button
-              key={value}
-              type="button"
-              variant={statusFilter === value ? 'default' : 'outline'}
-              size="sm"
-              className="rounded-full text-xs font-bold"
-              onClick={() => setStatusFilter(value as typeof statusFilter)}
-            >
-              {value === 'all' ? t('tracker.filter.all') : t(`tracker.status.${value === 'post_processed' ? 'postProcessed' : value}` as const)}
-            </Button>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
-          <div className="lg:sticky lg:top-6">
-            <ChallengeForm
-              project={activeProject}
-              editingState={editingState}
-              pieces={visiblePieces}
-              onSave={handleSavePiece}
-              onUpdate={handleUpdatePiece}
-              onCancelEdit={() => setEditingState({ mode: 'create' })}
-              activeSpools={activeSpools}
-            />
-          </div>
-          <ChallengePieceList
-            project={activeProject}
-            pieces={visiblePieces}
-            editingState={editingState}
-            onEdit={(id) => {
-              setEditingState({ mode: 'edit', id });
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            onDelete={handleDeletePiece}
-            onReorder={reorderPieces}
-            sortMode={sortMode}
-            onSortChange={setSortMode}
-            viewMode={viewMode}
-            onViewChange={setViewMode}
-          />
-        </div>
-      </div>
-
-      <div className="hidden print:block">
-        <TrackerPrintSummary project={activeProject} pieces={pieces} />
-      </div>
-
+  const sharedDialogs = (
+    <>
       <Dialog open={!!editingProject} onOpenChange={(open) => !open && setEditingProject(null)}>
         <DialogContent className="w-full sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{t('tracker_edit_project')}</DialogTitle>
-            <DialogDescription>
-              {t('tracker_edit_project_hint')}
-            </DialogDescription>
+            <DialogDescription>{t('tracker_edit_project_hint')}</DialogDescription>
           </DialogHeader>
           {editingProject && (
             <ProjectForm
@@ -440,7 +363,6 @@ export function FilamentTracker() {
         </DialogContent>
       </Dialog>
 
-      {/* PDF Customizer Modal */}
       {trackerPdfData && (
         <TrackerPdfCustomizer
           open={pdfCustomizerOpen}
@@ -448,6 +370,145 @@ export function FilamentTracker() {
           trackerData={trackerPdfData}
         />
       )}
+    </>
+  );
+
+  // ── Manager view ──────────────────────────────────────────────────────────────
+
+  if (view === 'manager' || !activeProject) {
+    return (
+      <>
+        <div className="print:hidden">
+          <ProjectManager
+            projects={projects}
+            activeProjectId={activeProject?.id ?? null}
+            onCreate={handleCreateProject}
+            onUpdate={updateProject}
+            onDelete={deleteProject}
+            onSelect={selectProject}
+            onOpenProject={handleOpenProject}
+          />
+        </div>
+        {activeProject && (
+          <div className="hidden print:block">
+            <TrackerPrintSummary project={activeProject} pieces={pieces} />
+          </div>
+        )}
+      </>
+    );
+  }
+
+  // ── Project detail view (full-width) ─────────────────────────────────────────
+
+  if (view === 'project') {
+    return (
+      <div className="w-full animate-fade-in">
+        <div className="print:hidden">
+          <ChallengeHero
+            project={activeProject}
+            pieces={pieces}
+            onBack={handleBack}
+            onPrint={openPdfCustomizer}
+            onEditProject={() => setEditingProject(activeProject)}
+            onDeleteProject={() => setDeleteTargetProject(activeProject)}
+            onViewPieces={handleGoToPieces}
+            onAddPiece={handleAddPiece}
+          />
+        </div>
+
+        <div className="hidden print:block">
+          <TrackerPrintSummary project={activeProject} pieces={pieces} />
+        </div>
+
+        {sharedDialogs}
+      </div>
+    );
+  }
+
+  // ── Pieces view (two-column desktop / stacked mobile) ────────────────────────
+
+  return (
+    <div className="w-full animate-fade-in">
+      <div className="print:hidden space-y-6">
+
+        {/* Breadcrumb nav */}
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <button
+            type="button"
+            onClick={handleBack}
+            className="hover:text-foreground transition-colors font-bold"
+          >
+            {t('pm_title')}
+          </button>
+          <span>/</span>
+          <button
+            type="button"
+            onClick={handleBackToProject}
+            className="hover:text-foreground transition-colors"
+          >
+            {activeProject.title}
+          </button>
+          <span>/</span>
+          <span className="text-foreground font-semibold">{t('hero_view_pieces')}</span>
+        </div>
+
+        {/* Status filter bar */}
+        <div className="flex flex-wrap gap-2">
+          {(['all', 'pending', 'printed', 'post_processed', 'delivered', 'failed'] as const).map((value) => (
+            <Button
+              key={value}
+              type="button"
+              variant={statusFilter === value ? 'default' : 'outline'}
+              size="sm"
+              className="rounded-full text-xs font-bold"
+              onClick={() => setStatusFilter(value)}
+            >
+              {value === 'all'
+                ? t('tracker.filter.all')
+                : t(`tracker.status.${value === 'post_processed' ? 'postProcessed' : value}` as const)}
+            </Button>
+          ))}
+        </div>
+
+        {/* Two-column layout */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,420px)_1fr] lg:items-start">
+          {/* Form — sticky on desktop */}
+          <div className="lg:sticky lg:top-6">
+            <ChallengeForm
+              project={activeProject}
+              editingState={editingState}
+              pieces={visiblePieces}
+              onSave={handleSavePiece}
+              onUpdate={handleUpdatePiece}
+              onCancelEdit={() => setEditingState({ mode: 'create' })}
+              activeSpools={activeSpools}
+            />
+          </div>
+
+          {/* Piece list — paginated, no internal scroll */}
+          <ChallengePieceList
+            project={activeProject}
+            pieces={visiblePieces}
+            editingState={editingState}
+            onEdit={(id) => {
+              setEditingState({ mode: 'edit', id });
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onDelete={handleDeletePiece}
+            onReorder={reorderPieces}
+            sortMode={sortMode}
+            onSortChange={setSortMode}
+            viewMode={viewMode}
+            onViewChange={setViewMode}
+          />
+        </div>
+      </div>
+
+      <div className="hidden print:block">
+        <TrackerPrintSummary project={activeProject} pieces={pieces} />
+      </div>
+
+      {sharedDialogs}
     </div>
   );
 }

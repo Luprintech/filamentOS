@@ -105,5 +105,6 @@ export type EditingState =
   | { mode: 'edit'; id: string };
 
 export type TrackerView =
-  | 'manager'      // lista de proyectos
-  | 'project';     // dentro de un proyecto concreto
+  | 'manager'      // grid de proyectos
+  | 'project'      // detalle del proyecto (full-width)
+  | 'pieces';      // listado de piezas del proyecto activo
