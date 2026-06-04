@@ -15,7 +15,12 @@ services:
       - SPOOLMAN_TIMEOUT_MS=${SPOOLMAN_TIMEOUT_MS:-10000}
     volumes:
       - sqlite_data:/data
+      - uploads_data:/app/backend/uploads
 
 volumes:
   sqlite_data:
+    name: filamentos_sqlite_data
+    driver: local
+  uploads_data:
+    name: filamentos_uploads_data
     driver: local

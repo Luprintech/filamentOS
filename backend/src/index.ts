@@ -3180,7 +3180,7 @@ app.post('/api/contact/send', async (req, res) => {
             <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
             <p style="color: #666; font-size: 12px;">
               Este mensaje fue enviado desde el chatbot BOBINA en 
-              <a href="https://calculadora3d.luprintech.com" style="color: #8b5cf6;">FilamentOS</a>
+              <a href="https://filamentos.luprintech.com" style="color: #8b5cf6;">FilamentOS</a>
             </p>
           </div>
         `,

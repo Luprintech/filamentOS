@@ -11,6 +11,7 @@ import { CookieBanner } from '@/components/cookie-banner';
 import { ChatBotBobina, ChatBotHandle } from '@/components/chatbot-bobina';
 import { IosInstallBanner } from '@/components/ios-install-banner';
 import { AndroidInstallBanner } from '@/components/android-install-banner';
+import { DataLossNoticeModal } from '@/components/data-loss-notice-modal';
 import { useCookieConsent } from '@/hooks/use-cookie-consent';
 import { AppLayout } from '@/components/app-layout';
 import { HomePage } from '@/pages/HomePage';
@@ -141,6 +142,7 @@ function AppRoutes() {
       <ChatBotBobina ref={chatBotRef} />
       <IosInstallBanner />
       <AndroidInstallBanner />
+      <DataLossNoticeModal />
     </>
   );
 }
